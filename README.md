@@ -4,10 +4,12 @@ Einfaches Listen-Tool für die Klasse (z. B. **Klassenfrühstück**, Ausflug, Mi
 Reines Node.js – **kein Next.js, kein Framework, keine Abhängigkeiten**.
 
 ## Funktionen
-- Login mit Passwort (Standard: `Klasse8T`)
-- Mehrere Listen anlegen (Titel, Datum, Notiz)
-- Einträge hinzufügen: *Was?* + *Wer bringt's mit?*
-- Abhaken, löschen
+- **Zwei Passwörter / Rollen**
+  - Schüler*innen: `Klasse8T` → Einträge hinzufügen, abhaken, **eigene** Einträge löschen
+  - Admins: `Klasse8TAdmin` → zusätzlich Listen **erstellen** und **löschen**, alle Einträge löschen
+- Listen mit Titel, Datum, Notiz und Fortschrittsbalken
+- Einträge: *Was?* + *Wer bringt's mit?* (Name wird im Browser gemerkt)
+- Konfetti, wenn eine Liste komplett erledigt ist 🎉
 - Daten werden in `data.json` gespeichert
 - Aktualisiert sich alle 15 Sekunden automatisch
 
@@ -23,7 +25,8 @@ Dann http://localhost:3000 öffnen.
 | Variable    | Standard     | Bedeutung                     |
 |-------------|--------------|-------------------------------|
 | `PORT`      | `3000`       | Port                          |
-| `PASSWORD`  | `Klasse8T`   | Login-Passwort                |
+| `PASSWORD`  | `Klasse8T`   | Passwort für Schüler*innen    |
+| `ADMIN_PASSWORD` | `Klasse8TAdmin` | Passwort für Admins     |
 | `DATA_FILE` | `./data.json`| Speicherort der Daten         |
 | `SECRET`    | (abgeleitet) | Schlüssel für Login-Cookies   |
 

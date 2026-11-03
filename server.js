@@ -6,6 +6,7 @@ const crypto = require('crypto');
 
 const PORT = process.env.PORT || 3000;
 const PASSWORD = process.env.PASSWORD || 'Klasse8T';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Klasse8TAdmin';
 const SECRET = process.env.SECRET || crypto.createHash('sha256').update('secret:' + PASSWORD).digest('hex');
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, 'data.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -31,17 +32,22 @@ const clean = (v, max = 200) => String(v ?? '').trim().slice(0, max);
 function sign(value) {
   return crypto.createHmac('sha256', SECRET).update(value).digest('hex');
 }
-function makeToken() {
+// Token: rolle.benutzerId.ablauf.signatur
+function makeToken(role, uid) {
   const exp = Date.now() + 1000 * 60 * 60 * 24 * 30; // 30 Tage
-  return `${exp}.${sign(String(exp))}`;
+  const payload = `${role}.${uid}.${exp}`;
+  return `${payload}.${sign(payload)}`;
 }
-function validToken(token) {
-  if (!token) return false;
-  const [exp, sig] = token.split('.');
-  if (!exp || !sig || Number(exp) < Date.now()) return false;
-  const expected = sign(exp);
-  return sig.length === expected.length &&
-    crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+function readToken(token) {
+  if (!token) return null;
+  const parts = token.split('.');
+  if (parts.length !== 4) return null;
+  const [role, uid, exp, sig] = parts;
+  if (!['admin', 'user'].includes(role) || Number(exp) < Date.now()) return null;
+  const expected = sign(`${role}.${uid}.${exp}`);
+  if (sig.length !== expected.length ||
+    !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+  return { role, uid, isAdmin: role === 'admin' };
 }
 function getCookie(req, name) {
   const header = req.headers.cookie || '';
@@ -51,10 +57,15 @@ function getCookie(req, name) {
   }
   return null;
 }
-function passwordOk(input) {
+function same(input, expected) {
   const a = crypto.createHash('sha256').update(String(input)).digest();
-  const b = crypto.createHash('sha256').update(PASSWORD).digest();
+  const b = crypto.createHash('sha256').update(expected).digest();
   return crypto.timingSafeEqual(a, b);
+}
+function roleForPassword(input) {
+  if (same(input, ADMIN_PASSWORD)) return 'admin';
+  if (same(input, PASSWORD)) return 'user';
+  return null;
 }
 
 // ---------- Helpers ----------
@@ -96,21 +107,29 @@ async function api(req, res, parts) {
 
   if (parts[0] === 'login' && method === 'POST') {
     const body = await readBody(req);
-    if (!passwordOk(body.password || '')) return send(res, 401, { error: 'Falsches Passwort' });
-    return send(res, 200, { ok: true }, {
-      'Set-Cookie': `auth=${makeToken()}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 30}`,
+    const role = roleForPassword(body.password || '');
+    if (!role) return send(res, 401, { error: 'Falsches Passwort' });
+    // Benutzer-ID behalten, falls schon eingeloggt (damit eigene Einträge eigene bleiben)
+    const uid = readToken(getCookie(req, 'auth'))?.uid || id();
+    return send(res, 200, { role, uid }, {
+      'Set-Cookie': `auth=${makeToken(role, uid)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 30}`,
     });
   }
   if (parts[0] === 'logout' && method === 'POST') {
     return send(res, 200, { ok: true }, { 'Set-Cookie': 'auth=; HttpOnly; Path=/; Max-Age=0' });
   }
 
-  if (!validToken(getCookie(req, 'auth'))) return send(res, 401, { error: 'Nicht eingeloggt' });
+  const me = readToken(getCookie(req, 'auth'));
+  if (!me) return send(res, 401, { error: 'Nicht eingeloggt' });
+  const adminOnly = () => send(res, 403, { error: 'Nur für Admins' });
+
+  if (parts[0] === 'me' && method === 'GET') return send(res, 200, { role: me.role, uid: me.uid });
 
   // GET /api/lists
   if (parts[0] === 'lists' && parts.length === 1) {
     if (method === 'GET') return send(res, 200, data.lists);
     if (method === 'POST') {
+      if (!me.isAdmin) return adminOnly();
       const body = await readBody(req);
       const title = clean(body.title, 100);
       if (!title) return send(res, 400, { error: 'Titel fehlt' });
@@ -126,6 +145,7 @@ async function api(req, res, parts) {
 
   // /api/lists/:id
   if (parts[0] === 'lists' && parts.length === 2) {
+    if (!me.isAdmin) return adminOnly();
     if (method === 'DELETE') {
       data.lists = data.lists.filter((l) => l !== list);
       saveData();
@@ -146,7 +166,7 @@ async function api(req, res, parts) {
     const body = await readBody(req);
     const what = clean(body.what, 150);
     if (!what) return send(res, 400, { error: 'Eintrag fehlt' });
-    const item = { id: id(), what, who: clean(body.who, 60), done: false };
+    const item = { id: id(), what, who: clean(body.who, 60), done: false, owner: me.uid };
     list.items.push(item);
     saveData();
     return send(res, 201, item);
@@ -156,13 +176,17 @@ async function api(req, res, parts) {
   if (parts[0] === 'lists' && parts[2] === 'items' && parts.length === 4) {
     const item = list.items.find((i) => i.id === parts[3]);
     if (!item) return send(res, 404, { error: 'Eintrag nicht gefunden' });
+    const mayEdit = me.isAdmin || item.owner === me.uid;
     if (method === 'DELETE') {
+      if (!mayEdit) return send(res, 403, { error: 'Nur eigene Einträge löschen' });
       list.items = list.items.filter((i) => i !== item);
       saveData();
       return send(res, 200, { ok: true });
     }
     if (method === 'PATCH') {
       const body = await readBody(req);
+      if ((body.what !== undefined || body.who !== undefined) && !mayEdit)
+        return send(res, 403, { error: 'Nur eigene Einträge bearbeiten' });
       if (body.what !== undefined) item.what = clean(body.what, 150) || item.what;
       if (body.who !== undefined) item.who = clean(body.who, 60);
       if (body.done !== undefined) item.done = !!body.done;
