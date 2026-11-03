@@ -6,8 +6,8 @@ Kein Next.js, kein Framework, kein Build.
 
 ## Funktionen
 - Zwei Rollen mit eigenem Passwort
-  - **Schüler*innen**: Einträge hinzufügen, abhaken, eigene Einträge löschen
-  - **Admins**: zusätzlich Listen erstellen und löschen, alle Einträge löschen
+  - **Schüler*innen**: Einträge hinzufügen, **eigene** Einträge abhaken und löschen
+  - **Admins**: zusätzlich Listen erstellen und löschen, alle Einträge abhaken und löschen
 - Listen mit Titel, Datum, Notiz und Fortschrittsbalken
 - Aktualisiert sich alle 15 Sekunden, Konfetti wenn alles erledigt ist 🎉
 

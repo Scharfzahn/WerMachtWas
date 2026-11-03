@@ -124,6 +124,9 @@ create or replace function public.set_item_done(p_token text, p_id uuid, p_done 
 returns void language plpgsql security definer set search_path = public, extensions as $$
 declare s public.sessions := public._session(p_token);
 begin
+  if s.role <> 'admin' and not exists (select 1 from public.items where id = p_id and owner = s.uid) then
+    raise exception 'Nur eigene Einträge abhaken';
+  end if;
   update public.items set done = p_done where id = p_id;
 end $$;
 

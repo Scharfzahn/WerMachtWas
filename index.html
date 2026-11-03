@@ -121,7 +121,9 @@
     width: 26px; height: 26px; flex: 0 0 auto; border-radius: 9px; border: 2px solid var(--border);
     background: transparent; display: grid; place-items: center; font-size: 15px; color: transparent; transition: all .2s;
   }
-  .check:hover { border-color: var(--green); }
+  .check:not(:disabled):hover { border-color: var(--green); }
+  .check:disabled { cursor: not-allowed; opacity: .45; border-style: dashed; }
+  li.done .check:disabled { opacity: .8; border-style: solid; }
   li.done .check { background: var(--green); border-color: var(--green); color: #052e1c; }
   li .what { flex: 1; min-width: 0; overflow-wrap: anywhere; font-weight: 600; transition: color .2s; }
   li.done .what { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 2px; }
@@ -321,7 +323,7 @@ function render() {
           const mine = admin || i.owner === me?.uid;
           return `
           <li class="${i.done ? 'done' : ''}" data-item="${i.id}">
-            <button class="check" data-action="toggle" aria-label="Abhaken">✓</button>
+            <button class="check" ${mine ? 'data-action="toggle"' : 'disabled title="Nur die Person, die das eingetragen hat, kann abhaken"'} aria-label="Abhaken">✓</button>
             <span class="what">${esc(i.what)}</span>
             ${i.who ? `<span class="who"><span class="avatar" style="background:${colorFor(i.who)}">${esc(initials(i.who))}</span><span>${esc(i.who)}</span></span>` : ''}
             ${mine ? `<button class="del" data-action="delItem" title="Entfernen">✕</button>` : `<span class="del-space"></span>`}
