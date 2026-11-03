@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Klassenlisten 8T</title>
+<style>
+  :root { --bg:#f6f4ef; --card:#fff; --text:#222; --muted:#777; --accent:#e07a2e; --line:#e5e1d8; --ok:#3a9d5d; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#1b1b1d; --card:#26262a; --text:#eee; --muted:#999; --line:#3a3a40; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--text); }
+  main { max-width: 720px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.5rem; margin: 8px 0 16px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
+  input, textarea, button { font: inherit; }
+  input, textarea { width:100%; padding:10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); }
+  button { padding:10px 14px; border:0; border-radius:8px; background:var(--accent); color:#fff; cursor:pointer; font-weight:600; }
+  button.ghost { background:transparent; color:var(--muted); border:1px solid var(--line); font-weight:400; }
+  button.small { padding:4px 10px; font-size:.85rem; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; }
+  .row > * { flex:1 1 140px; }
+  .row > button { flex:0 0 auto; }
+  .stack > * + * { margin-top:8px; }
+  .muted { color:var(--muted); font-size:.9rem; }
+  .error { color:#d33; min-height:1.2em; }
+  .list-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .list-head h2 { margin:0; font-size:1.2rem; }
+  ul { list-style:none; padding:0; margin:12px 0; }
+  li { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); }
+  li:last-child { border-bottom:0; }
+  li input[type=checkbox] { width:20px; height:20px; flex:0 0 auto; accent-color:var(--ok); }
+  li .text { flex:1; min-width:0; overflow-wrap:anywhere; }
+  li.done .what { text-decoration:line-through; color:var(--muted); }
+  li .who { color:var(--accent); font-weight:600; }
+  .del { background:none; color:var(--muted); padding:4px 8px; font-size:1.1rem; }
+  .del:hover { color:#d33; }
+  .hidden { display:none; }
+  #login { max-width:360px; margin:15vh auto 0; }
+</style>
+</head>
+<body>
+<main>
+  <section id="login" class="card stack hidden">
+    <h1>🥐 Klassenlisten 8T</h1>
+    <form id="loginForm" class="stack">
+      <input id="pw" type="password" placeholder="Passwort" autocomplete="current-password" required>
+      <button type="submit">Einloggen</button>
+      <div id="loginError" class="error"></div>
+    </form>
+  </section>
+
+  <section id="app" class="hidden">
+    <h1>🥐 Klassenlisten 8T <button class="ghost small" id="logout">Logout</button></h1>
+
+    <div class="card stack">
+      <strong>Neue Liste</strong>
+      <form id="newList" class="stack">
+        <div class="row">
+          <input name="title" placeholder="z. B. Klassenfrühstück" required maxlength="100">
+          <input name="date" type="date">
+        </div>
+        <input name="note" placeholder="Notiz (optional)" maxlength="500">
+        <button type="submit">Liste anlegen</button>
+      </form>
+    </div>
+
+    <div id="lists"></div>
+    <p id="empty" class="muted hidden">Noch keine Listen. Leg oben eine an!</p>
+  </section>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+let lists = [];
+
+async function api(path, method = 'GET', body) {
+  const res = await fetch('/api/' + path, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (res.status === 401 && path !== 'login') { showLogin(); throw new Error('auth'); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Fehler');
+  return data;
+}
+
+function showLogin() { $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); $('#pw').focus(); }
+function showApp() { $('#login').classList.add('hidden'); $('#app').classList.remove('hidden'); }
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; }
+function fmtDate(d) { if (!d) return ''; const [y,m,t] = d.split('-'); return `${t}.${m}.${y}`; }
+
+function render() {
+  $('#empty').classList.toggle('hidden', lists.length > 0);
+  $('#lists').innerHTML = lists.map((l) => {
+    const done = l.items.filter((i) => i.done).length;
+    return `
+    <div class="card" data-list="${l.id}">
+      <div class="list-head">
+        <div>
+          <h2>${esc(l.title)}</h2>
+          <div class="muted">${l.date ? '📅 ' + fmtDate(l.date) + ' · ' : ''}${l.items.length} ${l.items.length === 1 ? "Eintrag" : "Einträge"}${l.items.length ? ` · ${done} erledigt` : ''}</div>
+          ${l.note ? `<div class="muted">${esc(l.note)}</div>` : ''}
+        </div>
+        <button class="ghost small" data-action="delList">Löschen</button>
+      </div>
+      <ul>
+        ${l.items.map((i) => `
+          <li class="${i.done ? 'done' : ''}" data-item="${i.id}">
+            <input type="checkbox" data-action="toggle" ${i.done ? 'checked' : ''}>
+            <span class="text"><span class="what">${esc(i.what)}</span>${i.who ? ` – <span class="who">${esc(i.who)}</span>` : ''}</span>
+            <button class="del" data-action="delItem" title="Entfernen">✕</button>
+          </li>`).join('')}
+      </ul>
+      <form class="row" data-action="addItem">
+        <input name="what" placeholder="Was? (z. B. Brötchen)" required maxlength="150">
+        <input name="who" placeholder="Wer bringt's mit?" maxlength="60">
+        <button type="submit">+</button>
+      </form>
+    </div>`;
+  }).join('');
+}
+
+async function load() {
+  try { lists = await api('lists'); showApp(); render(); } catch {}
+}
+
+$('#loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('#loginError').textContent = '';
+  try { await api('login', 'POST', { password: $('#pw').value }); $('#pw').value = ''; load(); }
+  catch (err) { $('#loginError').textContent = err.message; }
+});
+
+$('#logout').addEventListener('click', async () => { await api('logout', 'POST'); showLogin(); });
+
+$('#newList').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const list = await api('lists', 'POST', { title: f.title.value, date: f.date.value, note: f.note.value });
+  lists.unshift(list); f.reset(); render();
+});
+
+$('#lists').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target, listId = f.closest('[data-list]').dataset.list;
+  const item = await api(`lists/${listId}/items`, 'POST', { what: f.what.value, who: f.who.value });
+  lists.find((l) => l.id === listId).items.push(item);
+  render();
+  document.querySelector(`[data-list="${listId}"] input[name=what]`).focus();
+});
+
+$('#lists').addEventListener('click', async (e) => {
+  const action = e.target.dataset.action;
+  if (!action || action === 'addItem') return;
+  const listEl = e.target.closest('[data-list]'), listId = listEl.dataset.list;
+  const list = lists.find((l) => l.id === listId);
+  const itemId = e.target.closest('[data-item]')?.dataset.item;
+
+  if (action === 'delList') {
+    if (!confirm(`Liste „${list.title}“ wirklich löschen?`)) return;
+    await api(`lists/${listId}`, 'DELETE');
+    lists = lists.filter((l) => l !== list);
+  } else if (action === 'toggle') {
+    const item = list.items.find((i) => i.id === itemId);
+    Object.assign(item, await api(`lists/${listId}/items/${itemId}`, 'PATCH', { done: e.target.checked }));
+  } else if (action === 'delItem') {
+    await api(`lists/${listId}/items/${itemId}`, 'DELETE');
+    list.items = list.items.filter((i) => i.id !== itemId);
+  }
+  render();
+});
+
+// Alle 15 Sekunden aktualisieren, damit man Einträge anderer sieht
+setInterval(() => { if (!$('#app').classList.contains('hidden') && !document.activeElement.matches('input')) load(); }, 15000);
+
+load();
+</script>
+</body>
+</html>
