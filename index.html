@@ -215,15 +215,29 @@ const $ = (s) => document.querySelector(s);
 let lists = [];
 let me = null;
 
-async function api(path, method = 'GET', body) {
-  const res = await fetch('/api/' + path, {
-    method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
+// ---- Supabase-Verbindung (öffentlicher Schlüssel, darf im Code stehen) ----
+const SUPABASE_URL = 'https://ndfbdzylcuvedkxkigjo.supabase.co';
+const SUPABASE_KEY = 'sb_publishable__p8wCd0JTOK4xg79BuE4Gw_P2IV5qV_';
+
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} },
+};
+
+// Ruft eine Datenbank-Funktion auf. Alle Rechte werden in der Datenbank geprüft.
+async function rpc(fn, args = {}, { silent = false } = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY },
+    body: JSON.stringify(fn === 'login' ? args : { p_token: store.get('token'), ...args }),
   });
-  const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && path !== 'login') { showLogin(); throw new Error('auth'); }
-  if (!res.ok) { if (path !== 'login') toast('⚠️ ' + (data.error || 'Fehler')); throw new Error(data.error || 'Fehler'); }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const msg = data?.message || 'Verbindungsfehler';
+    if (msg === 'Nicht eingeloggt') { store.set('token', null); showLogin(); throw new Error(msg); }
+    if (!silent) toast('⚠️ ' + msg);
+    throw new Error(msg);
+  }
   return data;
 }
 
@@ -316,7 +330,7 @@ function render() {
       </ul>
       <form class="add-row">
         <input name="what" placeholder="Was? (z. B. Brötchen)" required maxlength="150">
-        <input name="who" placeholder="Dein Name" maxlength="60" value="${esc(localStorage.getItem('name') || '')}">
+        <input name="who" placeholder="Dein Name" maxlength="60" value="${esc(store.get('name') || '')}">
         <button class="btn" type="submit">+ Eintragen</button>
       </form>
     </article>`;
@@ -325,8 +339,9 @@ function render() {
 
 async function load() {
   try {
-    if (!me) me = await api('me');
-    lists = await api('lists');
+    if (!store.get('token')) return showLogin();
+    if (!me) me = await rpc('me');
+    lists = await rpc('get_lists');
     showApp(); render();
   } catch {}
 }
@@ -335,7 +350,8 @@ $('#loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('#loginError').textContent = '';
   try {
-    me = await api('login', 'POST', { password: $('#pw').value });
+    me = await rpc('login', { p_password: $('#pw').value, p_uid: store.get('uid') }, { silent: true });
+    store.set('token', me.token); store.set('uid', me.uid);
     $('#pw').value = '';
     await load();
     toast(me.role === 'admin' ? '👑 Willkommen, Admin!' : '👋 Willkommen!');
@@ -345,13 +361,13 @@ $('#loginForm').addEventListener('submit', async (e) => {
   }
 });
 
-$('#logout').addEventListener('click', async () => { await api('logout', 'POST'); showLogin(); });
+$('#logout').addEventListener('click', async () => { await rpc('logout', {}, { silent: true }).catch(() => {}); store.set('token', null); showLogin(); });
 
 $('#newList').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target;
   try {
-    const list = await api('lists', 'POST', { title: f.title.value, date: f.date.value, note: f.note.value });
+    const list = await rpc('create_list', { p_title: f.title.value, p_date: f.date.value, p_note: f.note.value });
     lists.unshift(list); f.reset(); render(); toast('✨ Liste erstellt');
   } catch {}
 });
@@ -362,8 +378,8 @@ $('#lists').addEventListener('submit', async (e) => {
   const btn = f.querySelector('button'); btn.disabled = true;
   try {
     const who = f.who.value.trim();
-    if (who) { try { localStorage.setItem('name', who); } catch {} }
-    const item = await api(`lists/${listId}/items`, 'POST', { what: f.what.value, who });
+    if (who) store.set('name', who);
+    const item = await rpc('add_item', { p_list_id: listId, p_what: f.what.value, p_who: who });
     lists.find((l) => l.id === listId).items.push(item);
     render();
     document.querySelector(`[data-list="${listId}"] input[name=what]`).focus();
@@ -381,15 +397,16 @@ $('#lists').addEventListener('click', async (e) => {
   try {
     if (action === 'delList') {
       if (!confirm(`Liste „${list.title}“ wirklich löschen?`)) return;
-      await api(`lists/${listId}`, 'DELETE');
+      await rpc('delete_list', { p_id: listId });
       lists = lists.filter((l) => l !== list);
       toast('🗑️ Liste gelöscht');
     } else if (action === 'toggle') {
       const item = list.items.find((i) => i.id === itemId);
-      Object.assign(item, await api(`lists/${listId}/items/${itemId}`, 'PATCH', { done: !item.done }));
+      await rpc('set_item_done', { p_id: itemId, p_done: !item.done });
+      item.done = !item.done;
       if (item.done && list.items.every((i) => i.done)) { confetti(); toast('🎉 Alles erledigt!'); }
     } else if (action === 'delItem') {
-      await api(`lists/${listId}/items/${itemId}`, 'DELETE');
+      await rpc('delete_item', { p_id: itemId });
       list.items = list.items.filter((i) => i.id !== itemId);
     }
     render();
@@ -398,7 +415,7 @@ $('#lists').addEventListener('click', async (e) => {
 
 // Alle 15 Sekunden aktualisieren (nicht während man tippt)
 setInterval(() => {
-  if (me && !document.activeElement.matches('input')) api('lists').then((l) => { lists = l; render(); }).catch(() => {});
+  if (me && !document.activeElement.matches('input')) rpc('get_lists', {}, { silent: true }).then((l) => { lists = l; render(); }).catch(() => {});
 }, 15000);
 
 load();

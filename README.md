@@ -1,34 +1,28 @@
-# 🥐 Klassenlisten 8T
+# 🥐 WerMachtWas – Klassenlisten
 
 Einfaches Listen-Tool für die Klasse (z. B. **Klassenfrühstück**, Ausflug, Mitbringliste).
-Reines Node.js – **kein Next.js, kein Framework, keine Abhängigkeiten**.
+Eine einzige `index.html` (läuft auf **GitHub Pages**) + **Supabase** als Datenbank.
+Kein Next.js, kein Framework, kein Build.
 
 ## Funktionen
-- **Zwei Passwörter / Rollen**
-  - Schüler*innen: `Klasse8T` → Einträge hinzufügen, abhaken, **eigene** Einträge löschen
-  - Admins: `Klasse8TAdmin` → zusätzlich Listen **erstellen** und **löschen**, alle Einträge löschen
+- Zwei Rollen mit eigenem Passwort
+  - **Schüler*innen**: Einträge hinzufügen, abhaken, eigene Einträge löschen
+  - **Admins**: zusätzlich Listen erstellen und löschen, alle Einträge löschen
 - Listen mit Titel, Datum, Notiz und Fortschrittsbalken
-- Einträge: *Was?* + *Wer bringt's mit?* (Name wird im Browser gemerkt)
-- Konfetti, wenn eine Liste komplett erledigt ist 🎉
-- Daten werden in `data.json` gespeichert
-- Aktualisiert sich alle 15 Sekunden automatisch
+- Aktualisiert sich alle 15 Sekunden, Konfetti wenn alles erledigt ist 🎉
 
-## Starten
-```bash
-node server.js
-# oder
-npm start
-```
-Dann http://localhost:3000 öffnen.
+Die Passwörter stehen **nicht** im Code – sie liegen nur verschlüsselt (bcrypt) in der Datenbank.
+Alle Rechte werden in der Datenbank geprüft, nicht im Browser.
 
-## Einstellungen (optional, per Umgebungsvariable)
-| Variable    | Standard     | Bedeutung                     |
-|-------------|--------------|-------------------------------|
-| `PORT`      | `3000`       | Port                          |
-| `PASSWORD`  | `Klasse8T`   | Passwort für Schüler*innen    |
-| `ADMIN_PASSWORD` | `Klasse8TAdmin` | Passwort für Admins     |
-| `DATA_FILE` | `./data.json`| Speicherort der Daten         |
-| `SECRET`    | (abgeleitet) | Schlüssel für Login-Cookies   |
-
-Läuft überall, wo Node.js ≥ 18 läuft (z. B. Render, Railway, Raspberry Pi, eigener Server).
-Hinweis: Auf Hostern ohne dauerhaften Speicher gehen die Daten bei einem Neustart verloren.
+## Einrichtung
+1. Supabase-Projekt anlegen, im **SQL Editor** den Inhalt von `supabase/setup.sql` ausführen.
+2. Passwörter setzen (eigene Passwörter einsetzen):
+   ```sql
+   insert into public.settings(role, pw_hash) values
+     ('user',  extensions.crypt('SCHUELER-PASSWORT', extensions.gen_salt('bf'))),
+     ('admin', extensions.crypt('ADMIN-PASSWORT',    extensions.gen_salt('bf')))
+   on conflict (role) do update set pw_hash = excluded.pw_hash;
+   ```
+   Derselbe Befehl ändert die Passwörter später. Alle abmelden: `delete from public.sessions;`
+3. In `index.html` `SUPABASE_URL` und `SUPABASE_KEY` (Publishable Key) eintragen.
+4. GitHub Pages für das Repo aktivieren – fertig.
