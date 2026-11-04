@@ -184,6 +184,13 @@
   .del { background: none; color: var(--muted); width: 30px; height: 30px; border-radius: 9px; font-size: 1rem; flex: 0 0 auto; transition: all .2s; }
   .del:hover { background: var(--red); color: #fff; }
   .del-space { width: 30px; flex: 0 0 auto; }
+  .dev { flex: 0 0 auto; font-size: .7rem; font-weight: 800; padding: 3px 7px; border-radius: 8px; color: #120b24; font-family: ui-monospace, monospace; }
+  li .what { min-width: 4.5em; }
+  .dev-line { display: block; margin-top: 4px; font-size: .75rem; color: var(--red); font-weight: 700; }
+  .block { background: none; color: var(--muted); width: 30px; height: 30px; border-radius: 9px; font-size: .95rem; flex: 0 0 auto; transition: all .2s; }
+  .block:hover { background: var(--red); }
+  li.is-blocked { border-color: rgba(255,107,107,.45); background: rgba(255,107,107,.08); }
+  .blocked-banner { padding: 14px 16px; margin-bottom: 18px; border-radius: 14px; background: rgba(255,107,107,.15); border: 1px solid rgba(255,107,107,.4); font-weight: 700; }
   .empty-items { color: var(--muted); text-align: center; padding: 14px; font-size: .95rem; }
 
   .add-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; }
@@ -256,8 +263,9 @@
     <button id="adminPanel" class="new-btn glass hidden" type="button">
       <span class="plus">+</span><span>Neue Liste erstellen</span>
     </button>
-    <button id="trashBtn" class="chip-btn trash-btn hidden" type="button">🗑️ Papierkorb</button>
+    <button id="trashBtn" class="chip-btn trash-btn hidden" type="button">🗑️ Papierkorb & 🚫 Sperren</button>
 
+    <div id="blockedBanner" class="blocked-banner hidden">🚫 Dieses Gerät wurde von einem Admin gesperrt. Du kannst nichts mehr eintragen.</div>
     <div id="lists"></div>
     <div id="empty" class="empty-state glass hidden">
       <div class="big">📭</div>
@@ -362,7 +370,7 @@
 </dialog>
 
 <dialog id="trashDialog" class="glass">
-  <h2>🗑️ Papierkorb</h2>
+  <h2>🗑️ Papierkorb & Sperren</h2>
   <p class="muted-text">Gelöschtes bleibt hier 7 Tage, danach ist es endgültig weg.</p>
   <div id="trashContent" class="trash-section"></div>
   <div class="dialog-actions"><button type="button" class="chip-btn" id="trashClose">Schließen</button></div>
@@ -489,6 +497,7 @@ function render() {
   $('#empty').classList.toggle('hidden', lists.length > 0);
   $('#subtitle').textContent = `${lists.length} ${lists.length === 1 ? 'Liste' : 'Listen'}`;
   const sorted = [...lists].sort((a, b) => (a.hidden - b.hidden));
+  $('#blockedBanner').classList.toggle('hidden', !me?.blocked);
   $('#lists').innerHTML = sorted.map((l) => {
     const total = l.items.length, done = l.items.filter((i) => i.done).length;
     const pct = total ? Math.round((done / total) * 100) : 0;
@@ -515,21 +524,24 @@ function render() {
         <div class="progress-label">${done} von ${total} erledigt${pct === 100 ? ' 🎉' : ''}</div>` : ''}
       <ul>
         ${l.items.map((i) => {
-          const mine = admin || i.owner === me?.uid;
+          const own = i.mine ?? (i.owner === me?.uid);
+          const mine = admin || own;
           return `
-          <li class="${i.done ? 'done' : ''}" data-item="${i.id}">
+          <li class="${i.done ? 'done' : ''} ${i.blocked ? 'is-blocked' : ''}" data-item="${i.id}">
             <button class="check" ${mine ? 'data-action="toggle"' : 'disabled title="Nur die Person, die das eingetragen hat, kann abhaken"'} aria-label="Abhaken">✓</button>
-            <span class="what">${esc(i.what)}</span>
+            <span class="what">${esc(i.what)}${admin && i.device ? `<span class="dev-line"><span class="dev" style="background:${colorFor(i.device)}" title="Gleiche Farbe = gleiches Gerät">#${i.device}</span>${i.blocked ? ' gesperrt' : ''}</span>` : ''}</span>
             ${i.who ? `<span class="who"><span class="avatar" style="background:${colorFor(i.who)}">${esc(initials(i.who))}</span><span>${esc(i.who)}</span></span>` : ''}
+            ${admin && !own && i.device ? (i.blocked ? `<span class="block" title="Gerät ist gesperrt">🚫</span>`
+              : `<button class="block" data-action="blockDevice" title="Dieses Gerät sperren">🚫</button>`) : ''}
             ${mine ? `<button class="del" data-action="delItem" title="Entfernen">✕</button>` : `<span class="del-space"></span>`}
           </li>`;
         }).join('') || `<li class="empty-items" style="display:block">Noch nichts eingetragen – sei die/der Erste! 🙌</li>`}
       </ul>
-      <form class="add-row">
+      ${me?.blocked ? '' : `<form class="add-row">
         <input name="what" placeholder="Was? (z. B. Brötchen)" required maxlength="150">
         <input name="who" placeholder="Dein Name" maxlength="60" value="${esc(store.get('name') || '')}">
         <button class="btn" type="submit">+ Eintragen</button>
-      </form>
+      </form>`}
     </article>`;
   }).join('');
 }
@@ -557,7 +569,7 @@ async function initServer() {
 async function load() {
   try {
     if (!store.get(TOKEN_KEY)) return showLogin();
-    if (!me) me = await rpc('me');
+    me = { ...(me || {}), ...(await rpc('me')) };
     lists = await rpc('get_lists');
     showApp(); render();
   } catch {}
@@ -598,7 +610,9 @@ function ago(ts) {
 }
 async function openTrash() {
   let t;
+  let blocked = [];
   try { t = await rpc('get_trash'); } catch { return; }
+  try { blocked = await rpc('get_blocked', {}, { silent: true }); } catch {}
   const row = (fn, id, title, sub, extra = '') => `
     <div class="trash-row">
       <div class="info"><b>${title}</b><small>${sub}</small></div>
@@ -609,14 +623,25 @@ async function openTrash() {
   const itemRows = t.items.map((i) => row('restore_item', i.id, esc(i.what),
     `${i.who ? esc(i.who) + ' · ' : ''}in „${esc(i.list)}“ · gelöscht ${ago(i.deleted_at)}`,
     i.list_deleted ? '<small class="muted-text">Erst die Liste wiederherstellen</small>' : '')).join('');
-  $('#trashContent').innerHTML = (!listRows && !itemRows) ? '<div class="trash-empty">Der Papierkorb ist leer 🎉</div>' :
-    (listRows ? `<h3>Listen</h3>${listRows}` : '') + (itemRows ? `<h3>Einträge</h3>${itemRows}` : '');
+  const blockRows = blocked.map((b) => `
+    <div class="trash-row">
+      <span class="dev" style="background:${colorFor(b.device)}">#${b.device}</span>
+      <div class="info"><b>„${esc(b.sample)}“</b><small>gesperrt ${ago(b.blocked_at)}</small></div>
+      <button class="chip-btn" data-unblock="${b.id}">Entsperren</button>
+    </div>`).join('');
+  $('#trashContent').innerHTML = ((!listRows && !itemRows) ? '<div class="trash-empty">Der Papierkorb ist leer 🎉</div>' :
+    (listRows ? `<h3>Listen</h3>${listRows}` : '') + (itemRows ? `<h3>Einträge</h3>${itemRows}` : ''))
+    + `<h3>🚫 Gesperrte Geräte</h3>` + (blockRows || '<div class="trash-empty">Keine gesperrten Geräte</div>');
   if (!$('#trashDialog').open) $('#trashDialog').showModal();
 }
 $('#trashBtn').addEventListener('click', openTrash);
 $('#trashClose').addEventListener('click', () => $('#trashDialog').close());
 $('#trashContent').addEventListener('click', (e) => {
   const b = e.target.closest('[data-restore]'); if (b) restore(b.dataset.restore, b.dataset.id);
+  const u = e.target.closest('[data-unblock]');
+  if (u) rpc('unblock_device', { p_id: u.dataset.unblock }).then(async () => {
+    toast('✅ Entsperrt'); lists = await rpc('get_lists'); render(); openTrash();
+  }).catch(() => {});
 });
 
 // ---- Dialog: Liste erstellen / bearbeiten ----
@@ -698,6 +723,13 @@ $('#lists').addEventListener('click', async (e) => {
       await rpc('set_item_done', { p_id: itemId, p_done: !item.done });
       item.done = !item.done;
       if (item.done && list.items.every((i) => i.done)) { confetti(); toast('🎉 Alles erledigt!'); }
+    } else if (action === 'blockDevice') {
+      const item = list.items.find((i) => i.id === itemId);
+      if (!confirm(`Das Gerät, das „${item.what}“ eingetragen hat, sperren? Es kann dann nichts mehr eintragen.`)) return;
+      const delAll = confirm('Sollen auch ALLE Einträge von diesem Gerät gelöscht werden? (Sie landen im Papierkorb)\n\nOK = ja, löschen · Abbrechen = nur sperren');
+      const r = await rpc('block_device', { p_item_id: itemId, p_delete_all: delAll });
+      lists = await rpc('get_lists');
+      toast(delAll ? `🚫 Gesperrt · ${r.deleted} ${r.deleted === 1 ? 'Eintrag' : 'Einträge'} gelöscht` : '🚫 Gerät gesperrt');
     } else if (action === 'delItem') {
       await rpc('delete_item', { p_id: itemId });
       list.items = list.items.filter((i) => i.id !== itemId);
