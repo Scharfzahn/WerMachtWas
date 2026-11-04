@@ -23,7 +23,7 @@ Haupt-Servers – auf der Admin-Seite unten ändern!).
 Passwörter stehen **nicht** im Code – nur als bcrypt-Hash in der Datenbank. Alle Rechte werden in der Datenbank geprüft.
 
 ## Einrichtung (neu)
-1. Supabase-Projekt anlegen, im **SQL Editor** nacheinander `supabase/setup.sql` und `supabase/update-3-server.sql` ausführen.
+1. Supabase-Projekt anlegen, im **SQL Editor** nacheinander `supabase/setup.sql`, `supabase/update-3-server.sql` und `supabase/update-4-server-emoji.sql` ausführen.
 2. Passwörter des Haupt-Servers und das Haupt-Admin-Passwort setzen:
    ```sql
    update public.servers set

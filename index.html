@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1a1033">
 <title>WerMachtWas</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥐</text></svg>">
+<link id="favicon" rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥐</text></svg>">
 <style>
   :root {
     --bg: #120b24;
@@ -215,7 +215,7 @@
   <!-- Login -->
   <section id="login" class="hidden">
     <div class="login-card glass">
-      <div class="login-emoji">🥐</div>
+      <div class="login-emoji" data-server-emoji>🥐</div>
       <h1>Wer<span class="grad-text">Macht</span>Was</h1>
       <div class="server-chip" data-server-name></div>
       <p>Wer bringt was mit? Hier steht's.</p>
@@ -231,7 +231,7 @@
   <section id="app" class="hidden">
     <header>
       <div class="brand">
-        <div class="logo">🥐</div>
+        <div class="logo" data-server-emoji>🥐</div>
         <div>
           <h1>Wer<span class="grad-text">Macht</span>Was</h1>
           <small><span data-server-name></span> · <span id="subtitle">Listen</span></small>
@@ -320,6 +320,8 @@
       <div class="slug-row"><span id="slugPrefix"></span><input name="slug" placeholder="klasse8t" maxlength="40" autocapitalize="off" autocomplete="off" spellcheck="false"></div>
       <span class="hint" id="slugHint">Nur a–z, 0–9 und -</span>
     </label>
+    <div class="field-label">Emoji</div>
+    <div id="serverEmojiPicker" class="emoji-picker"></div>
     <label>Schüler*innen-Passwort<input name="userPw" type="text" autocomplete="off" maxlength="100"></label>
     <label>Admin-Passwort (darf Listen erstellen)<input name="adminPw" type="text" autocomplete="off" maxlength="100"></label>
     <div class="hint" id="pwHint"></div>
@@ -508,6 +510,11 @@ function render() {
   }).join('');
 }
 
+function setServerEmoji(emoji) {
+  if (!emoji) return;
+  document.querySelectorAll('[data-server-emoji]').forEach((el) => { el.textContent = emoji; });
+  $('#favicon').href = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>${emoji}</text></svg>`;
+}
 function setServerName(name) {
   document.querySelectorAll('[data-server-name]').forEach((el) => { el.textContent = name; });
   document.title = name + ' · WerMachtWas';
@@ -519,6 +526,7 @@ async function initServer() {
   catch { if (SERVER) info = { name: SERVER }; else info = { name: 'Klasse 8T' }; }
   if (!info) { document.title = 'Nicht gefunden · WerMachtWas'; return showOnly('notFound'); }
   setServerName(info.name);
+  setServerEmoji(info.emoji);
   load();
 }
 
@@ -641,7 +649,12 @@ setInterval(() => {
 }, 15000);
 
 // ================= Admin-Startseite (/admin) =================
-let servers = [], editingServer = null, slugTouched = false;
+let servers = [], editingServer = null, slugTouched = false, pickedServerEmoji = '🥐';
+const SERVER_EMOJIS = ['🥐','🏫','⭐','🚀','🦊','🐼','🦁','🐸','🐙','🦄','🐝','🌈','🔥','⚡','🌻','🍀','🍕','🍩','⚽','🏀','🎮','🎨','🎵','📚','🧪','🌍','🎉','💎'];
+function renderServerPicker() {
+  $('#serverEmojiPicker').innerHTML = SERVER_EMOJIS.map((e) =>
+    `<button type="button" class="${pickedServerEmoji === e ? 'sel' : ''}" data-emoji="${e}">${e}</button>`).join('');
+}
 const serverUrl = (slug) => location.origin + BASE + slug;
 
 function showSuperLogin() { showOnly('superLogin'); $('#superPw').focus(); }
@@ -659,7 +672,7 @@ function renderServers() {
   $('#servers').innerHTML = servers.map((v) => `
     <article class="list glass" data-server="${v.id}">
       <div class="list-head">
-        <div class="list-emoji">${v.slug ? '🏫' : '⭐'}</div>
+        <div class="list-emoji">${esc(v.emoji || '🥐')}</div>
         <div class="list-info">
           <h3>${esc(v.name)}</h3>
           <div class="meta">
@@ -696,6 +709,7 @@ function openServerDialog(v) {
   editingServer = v || null; slugTouched = !!v;
   f.reset();
   f.name.value = v?.name || '';
+  pickedServerEmoji = v?.emoji || '🥐'; renderServerPicker();
   f.slug.value = v?.slug || '';
   const isMain = v && !v.slug;
   f.slug.disabled = isMain;
@@ -720,6 +734,10 @@ $('#serverForm').slug.addEventListener('input', (e) => {
   e.target.value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
   updateSlugHint();
 });
+$('#serverEmojiPicker').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-emoji]'); if (!b) return;
+  pickedServerEmoji = b.dataset.emoji; renderServerPicker();
+});
 $('#serverCancel').addEventListener('click', () => $('#serverDialog').close());
 $('#newServerBtn').addEventListener('click', () => openServerDialog(null));
 
@@ -732,6 +750,7 @@ $('#serverForm').addEventListener('submit', async (e) => {
       p_id: editingServer?.id || null, p_name: f.name.value, p_slug: f.slug.value,
       p_user_pw: f.userPw.value, p_admin_pw: f.adminPw.value,
     });
+    await rpc('super_set_server_emoji', { p_id: res.id, p_emoji: pickedServerEmoji });
     $('#serverDialog').close();
     servers = await rpc('super_servers'); renderServers();
     toast(editingServer ? '💾 Gespeichert' : '✨ Server erstellt: /' + res.slug);
