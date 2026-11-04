@@ -19,11 +19,12 @@ Haupt-Servers – auf der Admin-Seite unten ändern!).
 - **Schüler*innen**: Einträge hinzufügen, **eigene** Einträge abhaken und löschen
 - **Admins**: zusätzlich Listen erstellen, **bearbeiten** (Name, Datum, Notiz, Emoji) und löschen, alle Einträge abhaken und löschen
 - Nach dem Datum bleibt eine Liste noch 5 Tage stehen, danach sehen sie nur noch Admins
+- Papierkorb: Nach dem Löschen kurz „Rückgängig“, Admins können Gelöschtes 7 Tage lang wiederherstellen
 
 Passwörter stehen **nicht** im Code – nur als bcrypt-Hash in der Datenbank. Alle Rechte werden in der Datenbank geprüft.
 
 ## Einrichtung (neu)
-1. Supabase-Projekt anlegen, im **SQL Editor** nacheinander `supabase/setup.sql`, `supabase/update-3-server.sql` und `supabase/update-4-server-emoji.sql` ausführen.
+1. Supabase-Projekt anlegen, im **SQL Editor** nacheinander `supabase/setup.sql`, `supabase/update-3-server.sql`, `supabase/update-4-server-emoji.sql` und `supabase/update-5-papierkorb.sql` ausführen.
 2. Passwörter des Haupt-Servers und das Haupt-Admin-Passwort setzen:
    ```sql
    update public.servers set

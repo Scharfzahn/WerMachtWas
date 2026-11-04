@@ -197,9 +197,19 @@
   #toast {
     position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); transform: translate(-50%, 120px);
     padding: 12px 20px; border-radius: 14px; font-weight: 700; z-index: 20; transition: transform .35s cubic-bezier(.2,1.4,.4,1);
-    max-width: calc(100% - 32px);
+    max-width: calc(100% - 32px); display: flex; align-items: center; gap: 14px; white-space: nowrap;
   }
   #toast.show { transform: translate(-50%, 0); }
+  #toast button { padding: 7px 14px; border-radius: 10px; background: var(--grad); color: #1a0b1f; font-weight: 800; }
+  #toast button:empty { display: none; }
+
+  .trash-btn { display: block; margin: -12px auto 22px; }
+  .trash-section h3 { margin: 18px 0 8px; font-size: 1rem; color: var(--muted); }
+  .trash-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 6px; border-radius: 14px; background: rgba(0,0,0,.22); }
+  .trash-row .info { flex: 1; min-width: 0; }
+  .trash-row .info b { display: block; overflow-wrap: anywhere; }
+  .trash-row .info small { color: var(--muted); }
+  .trash-empty { color: var(--muted); text-align: center; padding: 20px 0; }
 
   /* Konfetti */
   .confetti { position: fixed; top: -10px; width: 10px; height: 14px; z-index: 30; pointer-events: none; border-radius: 3px; animation: fall linear forwards; }
@@ -246,6 +256,7 @@
     <button id="adminPanel" class="new-btn glass hidden" type="button">
       <span class="plus">+</span><span>Neue Liste erstellen</span>
     </button>
+    <button id="trashBtn" class="chip-btn trash-btn hidden" type="button">🗑️ Papierkorb</button>
 
     <div id="lists"></div>
     <div id="empty" class="empty-state glass hidden">
@@ -350,7 +361,14 @@
   </form>
 </dialog>
 
-<div id="toast" class="glass"></div>
+<dialog id="trashDialog" class="glass">
+  <h2>🗑️ Papierkorb</h2>
+  <p class="muted-text">Gelöschtes bleibt hier 7 Tage, danach ist es endgültig weg.</p>
+  <div id="trashContent" class="trash-section"></div>
+  <div class="dialog-actions"><button type="button" class="chip-btn" id="trashClose">Schließen</button></div>
+</dialog>
+
+<div id="toast" class="glass"><span></span><button type="button"></button></div>
 
 <script>
 const $ = (s) => document.querySelector(s);
@@ -395,9 +413,14 @@ async function rpc(fn, args = {}, { silent = false } = {}) {
 }
 
 let toastTimer;
-function toast(msg) {
-  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+// toast('Text') oder toast('Text', { action: 'Rückgängig', onAction: fn })
+function toast(msg, opts = {}) {
+  const t = $('#toast'), btn = t.querySelector('button');
+  t.querySelector('span').textContent = msg;
+  btn.textContent = opts.action || '';
+  btn.onclick = opts.onAction ? async () => { t.classList.remove('show'); await opts.onAction(); } : null;
+  t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), opts.action ? 6000 : 2200);
 }
 
 function confetti() {
@@ -422,6 +445,7 @@ function showApp() {
   showOnly('app');
   const admin = me.role === 'admin';
   $('#adminPanel').classList.toggle('hidden', !admin);
+  $('#trashBtn').classList.toggle('hidden', !admin);
   $('#roleBadge').className = 'badge ' + (admin ? 'admin' : 'user');
   $('#roleBadge').textContent = admin ? '👑 Admin' : 'Schüler*in';
   $('#emptyText').textContent = admin ? 'Erstell oben die erste Liste!' : 'Sobald ein Admin eine Liste erstellt, taucht sie hier auf.';
@@ -556,6 +580,45 @@ $('#loginForm').addEventListener('submit', async (e) => {
 
 $('#logout').addEventListener('click', async () => { await rpc('logout', {}, { silent: true }).catch(() => {}); store.set(TOKEN_KEY, null); showLogin(); });
 
+// ---- Papierkorb ----
+async function restore(fn, id) {
+  try {
+    await rpc(fn, { p_id: id });
+    lists = await rpc('get_lists'); render();
+    toast('♻️ Wiederhergestellt');
+    if ($('#trashDialog').open) openTrash();
+  } catch {}
+}
+function ago(ts) {
+  const min = Math.round((Date.now() - new Date(ts)) / 60000);
+  if (min < 1) return 'gerade eben';
+  if (min < 60) return `vor ${min} Min.`;
+  const h = Math.round(min / 60); if (h < 24) return `vor ${h} Std.`;
+  const d = Math.round(h / 24); return `vor ${d} ${d === 1 ? 'Tag' : 'Tagen'}`;
+}
+async function openTrash() {
+  let t;
+  try { t = await rpc('get_trash'); } catch { return; }
+  const row = (fn, id, title, sub, extra = '') => `
+    <div class="trash-row">
+      <div class="info"><b>${title}</b><small>${sub}</small></div>
+      ${extra || `<button class="chip-btn" data-restore="${fn}" data-id="${id}">♻️ Wiederherstellen</button>`}
+    </div>`;
+  const listRows = t.lists.map((l) => row('restore_list', l.id, `${l.emoji || emojiFor(l.title)} ${esc(l.title)}`,
+    `Liste · ${l.count} ${l.count === 1 ? 'Eintrag' : 'Einträge'} · gelöscht ${ago(l.deleted_at)}`)).join('');
+  const itemRows = t.items.map((i) => row('restore_item', i.id, esc(i.what),
+    `${i.who ? esc(i.who) + ' · ' : ''}in „${esc(i.list)}“ · gelöscht ${ago(i.deleted_at)}`,
+    i.list_deleted ? '<small class="muted-text">Erst die Liste wiederherstellen</small>' : '')).join('');
+  $('#trashContent').innerHTML = (!listRows && !itemRows) ? '<div class="trash-empty">Der Papierkorb ist leer 🎉</div>' :
+    (listRows ? `<h3>Listen</h3>${listRows}` : '') + (itemRows ? `<h3>Einträge</h3>${itemRows}` : '');
+  if (!$('#trashDialog').open) $('#trashDialog').showModal();
+}
+$('#trashBtn').addEventListener('click', openTrash);
+$('#trashClose').addEventListener('click', () => $('#trashDialog').close());
+$('#trashContent').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-restore]'); if (b) restore(b.dataset.restore, b.dataset.id);
+});
+
 // ---- Dialog: Liste erstellen / bearbeiten ----
 const EMOJIS = ['🥐','🥨','🍞','🧀','🍓','🍕','🌭','🍰','🎂','🍪','🥤','🎉','🎈','🎁','🎄','🐣','🚌','🏕️','⚽','🎬','📚','🎨','🎵','📋'];
 let editingId = null, pickedEmoji = '';
@@ -629,7 +692,7 @@ $('#lists').addEventListener('click', async (e) => {
       if (!confirm(`Liste „${list.title}“ wirklich löschen?`)) return;
       await rpc('delete_list', { p_id: listId });
       lists = lists.filter((l) => l !== list);
-      toast('🗑️ Liste gelöscht');
+      toast('🗑️ Liste gelöscht', { action: 'Rückgängig', onAction: () => restore('restore_list', listId) });
     } else if (action === 'toggle') {
       const item = list.items.find((i) => i.id === itemId);
       await rpc('set_item_done', { p_id: itemId, p_done: !item.done });
@@ -638,6 +701,7 @@ $('#lists').addEventListener('click', async (e) => {
     } else if (action === 'delItem') {
       await rpc('delete_item', { p_id: itemId });
       list.items = list.items.filter((i) => i.id !== itemId);
+      toast('🗑️ Eintrag gelöscht', { action: 'Rückgängig', onAction: () => restore('restore_item', itemId) });
     }
     render();
   } catch {}
@@ -645,7 +709,7 @@ $('#lists').addEventListener('click', async (e) => {
 
 // Alle 15 Sekunden aktualisieren (nicht während man tippt)
 setInterval(() => {
-  if (me && !IS_SUPER && !document.activeElement.matches('input') && !$('#listDialog').open) rpc('get_lists', {}, { silent: true }).then((l) => { lists = l; render(); }).catch(() => {});
+  if (me && !IS_SUPER && !document.activeElement.matches('input') && !$('#listDialog').open && !$('#trashDialog').open) rpc('get_lists', {}, { silent: true }).then((l) => { lists = l; render(); }).catch(() => {});
 }, 15000);
 
 // ================= Admin-Startseite (/admin) =================
