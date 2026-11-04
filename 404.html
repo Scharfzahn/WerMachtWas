@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WerMachtWas</title>
+<style>body { margin: 0; background: #120b24; }</style>
+<script>
+  // GitHub Pages kennt Pfade wie /klasse8t nicht und zeigt diese Seite.
+  // Sie leitet zur App weiter: /<repo>/klasse8t  ->  /<repo>/?p=klasse8t
+  // (Auf *.github.io liegt die Seite unter /<repo>/, sonst direkt unter /)
+  var seg = location.pathname.split('/').filter(Boolean);
+  var baseLen = /\.github\.io$/.test(location.hostname) ? 1 : 0;
+  var base = '/' + seg.slice(0, baseLen).join('/') + (baseLen ? '/' : '');
+  var route = seg.slice(baseLen).join('/');
+  location.replace(base + (route ? '?p=' + encodeURIComponent(route) : '') + location.hash);
+</script>
+</head>
+<body></body>
+</html>

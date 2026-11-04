@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1a1033">
-<title>Klasse 8T · Listen</title>
+<title>WerMachtWas</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥐</text></svg>">
 <style>
   :root {
@@ -131,6 +131,24 @@
   .list.is-hidden { opacity: .55; }
   .list.is-hidden:hover { opacity: .85; }
 
+  .server-chip {
+    display: inline-block; margin: 2px 0 10px; padding: 5px 14px; border-radius: 999px; font-weight: 800; font-size: .9rem;
+    background: var(--glass-strong); border: 1px solid var(--border);
+  }
+  .server-chip:empty { display: none; }
+  .link-btn { display: inline-block; text-decoration: none; margin-top: 8px; }
+  .muted-text { color: var(--muted); margin: 0 0 12px; font-size: .9rem; }
+  .add-row.two { grid-template-columns: 1fr auto; }
+  .slug-row { display: flex; align-items: center; border: 1px solid var(--border); border-radius: 14px; background: rgba(0,0,0,.25); overflow: hidden; }
+  .slug-row span { padding-left: 14px; color: var(--muted); font-weight: 400; }
+  .slug-row input { border: 0; background: transparent; padding-left: 2px; box-shadow: none !important; }
+  .slug-row:focus-within { border-color: var(--pink); box-shadow: 0 0 0 4px rgba(255,95,162,.2); }
+  .slug-row input:disabled { color: var(--muted); }
+  .hint { font-weight: 400 !important; font-size: .8rem; color: var(--muted); }
+  .server-link { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 8px 8px 8px 14px; border-radius: 12px; background: rgba(0,0,0,.25); }
+  .server-link a { flex: 1; min-width: 0; color: var(--orange); font-weight: 700; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tag.main { background: rgba(139,92,246,.25); color: #c4b5fd; }
+
   /* Listen */
   .list { padding: 20px; margin-bottom: 18px; animation: pop .4s cubic-bezier(.2,1.3,.4,1) both; }
   @keyframes pop { from { opacity: 0; transform: translateY(12px) scale(.98); } }
@@ -198,7 +216,8 @@
   <section id="login" class="hidden">
     <div class="login-card glass">
       <div class="login-emoji">🥐</div>
-      <h1>Klasse <span class="grad-text">8T</span></h1>
+      <h1>Wer<span class="grad-text">Macht</span>Was</h1>
+      <div class="server-chip" data-server-name></div>
       <p>Wer bringt was mit? Hier steht's.</p>
       <form id="loginForm">
         <input id="pw" type="password" placeholder="Passwort" autocomplete="current-password" required>
@@ -214,8 +233,8 @@
       <div class="brand">
         <div class="logo">🥐</div>
         <div>
-          <h1>Klasse <span class="grad-text">8T</span></h1>
-          <small id="subtitle">Listen</small>
+          <h1>Wer<span class="grad-text">Macht</span>Was</h1>
+          <small><span data-server-name></span> · <span id="subtitle">Listen</span></small>
         </div>
       </div>
       <div class="head-right">
@@ -235,7 +254,81 @@
       <p id="emptyText"></p>
     </div>
   </section>
+  <!-- Server nicht gefunden -->
+  <section id="notFound" class="hidden">
+    <div class="login-card glass">
+      <div class="login-emoji">🤷</div>
+      <h1>Nicht gefunden</h1>
+      <p>Diesen Server gibt es nicht. Prüf nochmal den Link.</p>
+      <a class="btn link-btn" data-base-link href="./">Zur Startseite</a>
+    </div>
+  </section>
+
+  <!-- Admin-Startseite: Login -->
+  <section id="superLogin" class="hidden">
+    <div class="login-card glass">
+      <div class="login-emoji">🛠️</div>
+      <h1>Wer<span class="grad-text">Macht</span>Was</h1>
+      <div class="server-chip">Admin · Server verwalten</div>
+      <p>Hier legst du neue Server an und vergibst Passwörter.</p>
+      <form id="superLoginForm">
+        <input id="superPw" type="password" placeholder="Haupt-Admin-Passwort" autocomplete="current-password" required>
+        <button class="btn" type="submit">Anmelden →</button>
+        <div id="superLoginError" class="error"></div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Admin-Startseite: Verwaltung -->
+  <section id="superApp" class="hidden">
+    <header>
+      <div class="brand">
+        <div class="logo">🛠️</div>
+        <div>
+          <h1>Wer<span class="grad-text">Macht</span>Was</h1>
+          <small>Server verwalten · <span id="serverCount"></span></small>
+        </div>
+      </div>
+      <div class="head-right">
+        <span class="badge admin">👑 Admin</span>
+        <button class="chip-btn" id="superLogout">Logout</button>
+      </div>
+    </header>
+
+    <button id="newServerBtn" class="new-btn glass" type="button">
+      <span class="plus">+</span><span>Neuen Server erstellen</span>
+    </button>
+
+    <div id="servers"></div>
+
+    <div class="list glass">
+      <h3 style="margin:0 0 6px">🔑 Haupt-Admin-Passwort ändern</h3>
+      <p class="muted-text">Damit meldest du dich hier auf der Admin-Seite an.</p>
+      <form id="superPwForm" class="add-row two">
+        <input name="pw" type="password" placeholder="Neues Passwort (mind. 6 Zeichen)" minlength="6" required autocomplete="new-password">
+        <button class="btn" type="submit">Ändern</button>
+      </form>
+    </div>
+  </section>
 </main>
+
+<dialog id="serverDialog" class="glass">
+  <form id="serverForm" method="dialog">
+    <h2 id="serverDialogTitle">✨ Neuer Server</h2>
+    <label>Name<input name="name" placeholder="z. B. Klasse 8T" required maxlength="60"></label>
+    <label>Link
+      <div class="slug-row"><span id="slugPrefix"></span><input name="slug" placeholder="klasse8t" maxlength="40" autocapitalize="off" autocomplete="off" spellcheck="false"></div>
+      <span class="hint" id="slugHint">Nur a–z, 0–9 und -</span>
+    </label>
+    <label>Schüler*innen-Passwort<input name="userPw" type="text" autocomplete="off" maxlength="100"></label>
+    <label>Admin-Passwort (darf Listen erstellen)<input name="adminPw" type="text" autocomplete="off" maxlength="100"></label>
+    <div class="hint" id="pwHint"></div>
+    <div class="dialog-actions">
+      <button type="button" class="chip-btn" id="serverCancel">Abbrechen</button>
+      <button type="submit" class="btn" id="serverSave">Erstellen</button>
+    </div>
+  </form>
+</dialog>
 
 <dialog id="listDialog" class="glass">
   <form id="listForm" method="dialog">
@@ -262,6 +355,17 @@ const $ = (s) => document.querySelector(s);
 let lists = [];
 let me = null;
 
+// ---- Routing: <BASE> = Haupt-Server, <BASE>klasse8t = anderer Server, <BASE>admin = Verwaltung ----
+// GitHub Pages kennt /klasse8t nicht und zeigt 404.html – die leitet als ?p=klasse8t hierher.
+const BASE = location.pathname.replace(/[^/]*$/, '');
+const ROUTE = (new URLSearchParams(location.search).get('p') || '').toLowerCase().replace(/^\/+|\/+$/g, '');
+if (ROUTE) history.replaceState(null, '', BASE + ROUTE + location.hash);
+const IS_SUPER = ROUTE === 'admin';
+const SERVER = IS_SUPER ? null : ROUTE;
+// Haupt-Server behält den alten Schlüssel, damit niemand neu einloggen muss
+const TOKEN_KEY = IS_SUPER ? 'token:__admin' : (SERVER ? 'token:' + SERVER : 'token');
+const NO_TOKEN = ['login', 'server_info', 'super_login'];
+
 // ---- Supabase-Verbindung (öffentlicher Schlüssel, darf im Code stehen) ----
 const SUPABASE_URL = 'https://ndfbdzylcuvedkxkigjo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable__p8wCd0JTOK4xg79BuE4Gw_P2IV5qV_';
@@ -276,12 +380,12 @@ async function rpc(fn, args = {}, { silent = false } = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY },
-    body: JSON.stringify(fn === 'login' ? args : { p_token: store.get('token'), ...args }),
+    body: JSON.stringify(NO_TOKEN.includes(fn) ? args : { p_token: store.get(TOKEN_KEY), ...args }),
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     const msg = data?.message || 'Verbindungsfehler';
-    if (msg === 'Nicht eingeloggt') { store.set('token', null); showLogin(); throw new Error(msg); }
+    if (msg === 'Nicht eingeloggt') { store.set(TOKEN_KEY, null); IS_SUPER ? showSuperLogin() : showLogin(); throw new Error(msg); }
     if (!silent) toast('⚠️ ' + msg);
     throw new Error(msg);
   }
@@ -308,9 +412,12 @@ function confetti() {
   }
 }
 
-function showLogin() { me = null; $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); $('#pw').focus(); }
+function showOnly(id) {
+  for (const sec of ['login', 'app', 'notFound', 'superLogin', 'superApp']) $('#' + sec).classList.toggle('hidden', sec !== id);
+}
+function showLogin() { me = null; showOnly('login'); $('#pw').focus(); }
 function showApp() {
-  $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
+  showOnly('app');
   const admin = me.role === 'admin';
   $('#adminPanel').classList.toggle('hidden', !admin);
   $('#roleBadge').className = 'badge ' + (admin ? 'admin' : 'user');
@@ -401,9 +508,23 @@ function render() {
   }).join('');
 }
 
+function setServerName(name) {
+  document.querySelectorAll('[data-server-name]').forEach((el) => { el.textContent = name; });
+  document.title = name + ' · WerMachtWas';
+}
+
+async function initServer() {
+  let info = null;
+  try { info = await rpc('server_info', { p_server: SERVER }, { silent: true }); }
+  catch { if (SERVER) info = { name: SERVER }; else info = { name: 'Klasse 8T' }; }
+  if (!info) { document.title = 'Nicht gefunden · WerMachtWas'; return showOnly('notFound'); }
+  setServerName(info.name);
+  load();
+}
+
 async function load() {
   try {
-    if (!store.get('token')) return showLogin();
+    if (!store.get(TOKEN_KEY)) return showLogin();
     if (!me) me = await rpc('me');
     lists = await rpc('get_lists');
     showApp(); render();
@@ -414,8 +535,8 @@ $('#loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('#loginError').textContent = '';
   try {
-    me = await rpc('login', { p_password: $('#pw').value, p_uid: store.get('uid') }, { silent: true });
-    store.set('token', me.token); store.set('uid', me.uid);
+    me = await rpc('login', { p_password: $('#pw').value, p_uid: store.get('uid'), p_server: SERVER }, { silent: true });
+    store.set(TOKEN_KEY, me.token); store.set('uid', me.uid);
     $('#pw').value = '';
     await load();
     toast(me.role === 'admin' ? '👑 Willkommen, Admin!' : '👋 Willkommen!');
@@ -425,7 +546,7 @@ $('#loginForm').addEventListener('submit', async (e) => {
   }
 });
 
-$('#logout').addEventListener('click', async () => { await rpc('logout', {}, { silent: true }).catch(() => {}); store.set('token', null); showLogin(); });
+$('#logout').addEventListener('click', async () => { await rpc('logout', {}, { silent: true }).catch(() => {}); store.set(TOKEN_KEY, null); showLogin(); });
 
 // ---- Dialog: Liste erstellen / bearbeiten ----
 const EMOJIS = ['🥐','🥨','🍞','🧀','🍓','🍕','🌭','🍰','🎂','🍪','🥤','🎉','🎈','🎁','🎄','🐣','🚌','🏕️','⚽','🎬','📚','🎨','🎵','📋'];
@@ -516,10 +637,148 @@ $('#lists').addEventListener('click', async (e) => {
 
 // Alle 15 Sekunden aktualisieren (nicht während man tippt)
 setInterval(() => {
-  if (me && !document.activeElement.matches('input') && !$('#listDialog').open) rpc('get_lists', {}, { silent: true }).then((l) => { lists = l; render(); }).catch(() => {});
+  if (me && !IS_SUPER && !document.activeElement.matches('input') && !$('#listDialog').open) rpc('get_lists', {}, { silent: true }).then((l) => { lists = l; render(); }).catch(() => {});
 }, 15000);
 
-load();
+// ================= Admin-Startseite (/admin) =================
+let servers = [], editingServer = null, slugTouched = false;
+const serverUrl = (slug) => location.origin + BASE + slug;
+
+function showSuperLogin() { showOnly('superLogin'); $('#superPw').focus(); }
+
+async function loadSuper() {
+  try {
+    if (!store.get(TOKEN_KEY)) return showSuperLogin();
+    servers = await rpc('super_servers');
+    showOnly('superApp'); renderServers();
+  } catch {}
+}
+
+function renderServers() {
+  $('#serverCount').textContent = `${servers.length} ${servers.length === 1 ? 'Server' : 'Server'}`;
+  $('#servers').innerHTML = servers.map((v) => `
+    <article class="list glass" data-server="${v.id}">
+      <div class="list-head">
+        <div class="list-emoji">${v.slug ? '🏫' : '⭐'}</div>
+        <div class="list-info">
+          <h3>${esc(v.name)}</h3>
+          <div class="meta">
+            <span>📋 ${v.lists} ${v.lists === 1 ? 'Liste' : 'Listen'}</span>
+            <span>📝 ${v.items} ${v.items === 1 ? 'Eintrag' : 'Einträge'}</span>
+          </div>
+          ${v.slug ? '' : '<div class="meta"><span class="tag main">Haupt-Server · normaler Link</span></div>'}
+        </div>
+        <div class="head-actions">
+          <button class="chip-btn" data-action="editServer">✏️ Bearbeiten</button>
+          ${v.slug ? '<button class="chip-btn danger" data-action="delServer">Löschen</button>' : ''}
+        </div>
+      </div>
+      <div class="server-link">
+        <a href="${esc(serverUrl(v.slug))}" target="_blank" rel="noopener">${esc(serverUrl(v.slug).replace(/^https?:\/\//, ''))}</a>
+        <button class="chip-btn" data-action="copyLink">📋 Kopieren</button>
+      </div>
+    </article>`).join('');
+}
+
+function slugify(name) {
+  return name.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]+/g, '').slice(0, 40);
+}
+
+function updateSlugHint() {
+  const f = $('#serverForm'), isMain = editingServer && !editingServer.slug;
+  $('#slugHint').textContent = isMain ? 'Der Haupt-Server behält immer den normalen Link.'
+    : '🔗 ' + (location.host + BASE + (f.slug.value || '…')) + '  ·  nur a–z, 0–9 und -';
+}
+
+function openServerDialog(v) {
+  const f = $('#serverForm');
+  editingServer = v || null; slugTouched = !!v;
+  f.reset();
+  f.name.value = v?.name || '';
+  f.slug.value = v?.slug || '';
+  const isMain = v && !v.slug;
+  f.slug.disabled = isMain;
+  f.slug.placeholder = isMain ? '(normaler Link)' : 'klasse8t';
+  $('#slugPrefix').textContent = '/';
+  updateSlugHint();
+  f.userPw.required = f.adminPw.required = !v;
+  f.userPw.placeholder = f.adminPw.placeholder = v ? 'leer lassen = bleibt gleich' : 'mind. 4 Zeichen';
+  $('#pwHint').textContent = v ? 'Wenn du ein Passwort änderst, werden alle mit dem alten Passwort abgemeldet.' : '';
+  $('#serverDialogTitle').textContent = v ? '✏️ Server bearbeiten' : '✨ Neuer Server';
+  $('#serverSave').textContent = v ? 'Speichern' : 'Erstellen';
+  $('#serverDialog').showModal();
+  if (!v) f.name.focus();
+}
+
+$('#serverForm').name.addEventListener('input', (e) => {
+  if (!slugTouched && !editingServer) $('#serverForm').slug.value = slugify(e.target.value);
+  updateSlugHint();
+});
+$('#serverForm').slug.addEventListener('input', (e) => {
+  slugTouched = true;
+  e.target.value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+  updateSlugHint();
+});
+$('#serverCancel').addEventListener('click', () => $('#serverDialog').close());
+$('#newServerBtn').addEventListener('click', () => openServerDialog(null));
+
+$('#serverForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target, btn = $('#serverSave');
+  btn.disabled = true;
+  try {
+    const res = await rpc('super_save_server', {
+      p_id: editingServer?.id || null, p_name: f.name.value, p_slug: f.slug.value,
+      p_user_pw: f.userPw.value, p_admin_pw: f.adminPw.value,
+    });
+    $('#serverDialog').close();
+    servers = await rpc('super_servers'); renderServers();
+    toast(editingServer ? '💾 Gespeichert' : '✨ Server erstellt: /' + res.slug);
+  } catch {}
+  btn.disabled = false;
+});
+
+$('#servers').addEventListener('click', async (e) => {
+  const el = e.target.closest('[data-action]'); if (!el) return;
+  const v = servers.find((x) => x.id === el.closest('[data-server]').dataset.server);
+  try {
+    if (el.dataset.action === 'editServer') openServerDialog(v);
+    else if (el.dataset.action === 'copyLink') {
+      try { await navigator.clipboard.writeText(serverUrl(v.slug)); toast('📋 Link kopiert'); }
+      catch { prompt('Link kopieren:', serverUrl(v.slug)); }
+    } else if (el.dataset.action === 'delServer') {
+      if (!confirm(`Server „${v.name}“ mit allen ${v.lists} Listen wirklich löschen? Das kann man nicht rückgängig machen.`)) return;
+      await rpc('super_delete_server', { p_id: v.id });
+      servers = servers.filter((x) => x !== v); renderServers(); toast('🗑️ Server gelöscht');
+    }
+  } catch {}
+});
+
+$('#superLoginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('#superLoginError').textContent = '';
+  try {
+    const r = await rpc('super_login', { p_password: $('#superPw').value }, { silent: true });
+    store.set(TOKEN_KEY, r.token); $('#superPw').value = '';
+    await loadSuper(); toast('👑 Willkommen!');
+  } catch (err) {
+    $('#superLoginError').textContent = err.message;
+    const card = $('#superLogin .login-card'); card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
+  }
+});
+$('#superLogout').addEventListener('click', async () => {
+  await rpc('logout', {}, { silent: true }).catch(() => {}); store.set(TOKEN_KEY, null); showSuperLogin();
+});
+$('#superPwForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { await rpc('super_set_password', { p_new: e.target.pw.value }); e.target.reset(); toast('🔑 Passwort geändert'); } catch {}
+});
+
+document.querySelectorAll('[data-base-link]').forEach((a) => { a.href = BASE; });
+
+if (IS_SUPER) { document.title = 'Admin · WerMachtWas'; loadSuper(); }
+else initServer();
 </script>
 </body>
 </html>
