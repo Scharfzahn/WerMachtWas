@@ -250,12 +250,16 @@
   .empty-state p { color: var(--muted); }
 
   /* Toast */
+  /* Oben statt unten: unten liegt auf dem iPhone die Safari-Leiste drüber.
+     Versteckt = ganz unsichtbar (nicht nur verschoben), damit nie ein Rest übersteht. */
   #toast {
-    position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); transform: translate(-50%, 120px);
-    padding: 12px 20px; border-radius: 14px; font-weight: 700; z-index: 20; transition: transform .35s cubic-bezier(.2,1.4,.4,1);
+    position: fixed; left: 50%; top: max(14px, calc(env(safe-area-inset-top) + 6px)); transform: translate(-50%, calc(-100% - 40px));
+    padding: 12px 20px; border-radius: 14px; font-weight: 700; z-index: 50;
     max-width: calc(100% - 32px); display: flex; align-items: center; gap: 14px; white-space: nowrap;
+    opacity: 0; visibility: hidden; pointer-events: none; background: rgba(30,18,56,.92);
+    transition: transform .35s cubic-bezier(.2,1.4,.4,1), opacity .25s, visibility 0s linear .35s;
   }
-  #toast.show { transform: translate(-50%, 0); }
+  #toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; pointer-events: auto; transition: transform .35s cubic-bezier(.2,1.4,.4,1), opacity .2s, visibility 0s; }
   #toast button { padding: 7px 14px; border-radius: 10px; background: var(--grad); color: #1a0b1f; font-weight: 800; }
   #toast button:empty { display: none; }
 
