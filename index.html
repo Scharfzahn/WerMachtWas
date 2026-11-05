@@ -24,13 +24,19 @@
     --font: ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI Variable Display", system-ui, -apple-system, sans-serif;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { min-height: 100%; }
+  /* Grundverlauf auf <html>: der füllt auch die Fläche unter der Safari-Leiste und beim Überscrollen,
+     damit es dort nie schwarz wird. Die Farbe am Ende passt zum pinken Fleck unten. */
+  html {
+    min-height: 100%;
+    background: #2a0f33 linear-gradient(180deg, #160c2e 0%, #1d0d35 45%, #2a0f33 100%) no-repeat;
+  }
   body {
-    margin: 0; font-family: var(--font); color: var(--text); background: var(--bg);
+    min-height: 100%; margin: 0; font-family: var(--font); color: var(--text); background: transparent;
     overflow-x: hidden;
   }
   /* animierte Farbblobs im Hintergrund */
-  .blobs { position: fixed; inset: 0; z-index: -1; overflow: hidden; filter: blur(70px); opacity: .75; }
+  /* So hoch wie der größtmögliche Bildschirm (iOS: Leiste eingeklappt), plus Puffer */
+  .blobs { position: fixed; top: -10vh; left: 0; right: 0; height: 125vh; height: calc(100lvh + 20vh); z-index: -1; overflow: hidden; filter: blur(70px); opacity: .75; pointer-events: none; }
   .blobs span { position: absolute; width: 50vmax; height: 50vmax; border-radius: 50%; animation: float 22s ease-in-out infinite alternate; }
   .blobs span:nth-child(1) { background: #7c3aed; top: -20vmax; left: -15vmax; }
   .blobs span:nth-child(2) { background: #db2777; bottom: -25vmax; right: -15vmax; animation-delay: -7s; }
