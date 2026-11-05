@@ -21,11 +21,12 @@ Haupt-Servers – auf der Admin-Seite unten ändern!).
 - Nach dem Datum bleibt eine Liste noch 5 Tage stehen, danach sehen sie nur noch Admins
 - Papierkorb: Nach dem Löschen kurz „Rückgängig“, Admins können Gelöschtes 7 Tage lang wiederherstellen
 - Geräte sperren: Admins sehen pro Eintrag einen anonymen Gerätecode (gleiche Farbe = gleiches Gerät) und können Geräte sperren
+- Ordnung: Einträge werden automatisch in Kategorien sortiert (Admins können korrigieren), Sortieren nach Kategorie/A–Z/Person/Neueste, Suchfeld, Hinweis bei doppelten Einträgen
 
 Passwörter stehen **nicht** im Code – nur als bcrypt-Hash in der Datenbank. Alle Rechte werden in der Datenbank geprüft.
 
 ## Einrichtung (neu)
-1. Supabase-Projekt anlegen, im **SQL Editor** nacheinander `supabase/setup.sql`, `supabase/update-3-server.sql`, `supabase/update-4-server-emoji.sql`, `supabase/update-5-papierkorb.sql` und `supabase/update-6-geraete-sperren.sql` ausführen.
+1. Supabase-Projekt anlegen, im **SQL Editor** nacheinander `supabase/setup.sql`, `supabase/update-3-server.sql`, `supabase/update-4-server-emoji.sql`, `supabase/update-5-papierkorb.sql` , `supabase/update-6-geraete-sperren.sql` und `supabase/update-7-kategorien.sql` ausführen.
 2. Passwörter des Haupt-Servers und das Haupt-Admin-Passwort setzen:
    ```sql
    update public.servers set

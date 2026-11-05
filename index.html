@@ -186,10 +186,32 @@
   .del-space { width: 30px; flex: 0 0 auto; }
   .dev { flex: 0 0 auto; font-size: .7rem; font-weight: 800; padding: 3px 7px; border-radius: 8px; color: #120b24; font-family: ui-monospace, monospace; }
   li .what { min-width: 4.5em; }
-  .dev-line { display: block; margin-top: 4px; font-size: .75rem; color: var(--red); font-weight: 700; }
+  .dev-line { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 4px; font-size: .75rem; color: var(--red); font-weight: 700; }
   .block { background: none; color: var(--muted); width: 30px; height: 30px; border-radius: 9px; font-size: .95rem; flex: 0 0 auto; transition: all .2s; }
   .block:hover { background: var(--red); }
   li.is-blocked { border-color: rgba(255,107,107,.45); background: rgba(255,107,107,.08); }
+  .search { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 16px; margin-bottom: 18px; border-radius: 16px; }
+  .search input { border: 0; background: transparent; padding: 10px 4px; box-shadow: none !important; }
+  .search .chip-btn { flex: 0 0 auto; }
+  .list-tools { display: flex; justify-content: flex-end; margin: 10px 0 -2px; }
+  .sort-select {
+    font: inherit; font-size: .85rem; color: var(--muted); background: var(--glass-strong); border: 1px solid var(--border);
+    border-radius: 999px; padding: 6px 12px; cursor: pointer; color-scheme: dark;
+  }
+  li.cat-head {
+    display: flex; justify-content: space-between; background: none; border: 0; padding: 12px 4px 4px; margin: 0;
+    font-size: .8rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted);
+  }
+  li.cat-head:hover { border: 0; }
+  li.cat-head:first-child { padding-top: 0; }
+  li.mine-row { border-color: rgba(255,169,77,.35); }
+  .cat-chip { margin-left: 6px; padding: 2px 8px; border-radius: 8px; font-size: .72rem; font-weight: 700; color: var(--muted); background: var(--glass-strong); }
+  .cat-chip:hover { color: var(--text); }
+  .cat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .cat-grid button { padding: 12px; border-radius: 12px; background: rgba(0,0,0,.25); border: 2px solid transparent; font-weight: 700; text-align: left; }
+  .cat-grid button.sel { border-color: var(--pink); background: rgba(255,95,162,.18); }
+  .cat-grid button:hover { background: var(--glass-strong); }
+  .no-hits { text-align: center; color: var(--muted); padding: 30px 0; }
   .blocked-banner { padding: 14px 16px; margin-bottom: 18px; border-radius: 14px; background: rgba(255,107,107,.15); border: 1px solid rgba(255,107,107,.4); font-weight: 700; }
   .empty-items { color: var(--muted); text-align: center; padding: 14px; font-size: .95rem; }
 
@@ -265,6 +287,11 @@
     </button>
     <button id="trashBtn" class="chip-btn trash-btn hidden" type="button">🗑️ Papierkorb & 🚫 Sperren</button>
 
+    <div id="searchBox" class="search glass hidden">
+      <span>🔍</span>
+      <input id="search" type="search" placeholder="Suchen: was oder wer?" autocomplete="off" enterkeyhint="search">
+      <button id="searchClear" class="chip-btn hidden" type="button">✕</button>
+    </div>
     <div id="blockedBanner" class="blocked-banner hidden">🚫 Dieses Gerät wurde von einem Admin gesperrt. Du kannst nichts mehr eintragen.</div>
     <div id="lists"></div>
     <div id="empty" class="empty-state glass hidden">
@@ -367,6 +394,13 @@
       <button type="submit" class="btn" id="dialogSave">Speichern</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="catDialog" class="glass">
+  <h2>🏷️ Kategorie</h2>
+  <p class="muted-text" id="catItemName"></p>
+  <div id="catGrid" class="cat-grid"></div>
+  <div class="dialog-actions"><button type="button" class="chip-btn" id="catClose">Abbrechen</button></div>
 </dialog>
 
 <dialog id="trashDialog" class="glass">
@@ -492,14 +526,103 @@ function statusTag(l, admin) {
   return `<div class="meta"><span class="tag over">⏰ Vorbei · noch ${d} ${d === 1 ? 'Tag' : 'Tage'} sichtbar</span></div>`;
 }
 
+// ---- Kategorien (automatisch nach Stichwörtern, Admins können korrigieren) ----
+const CATS = [
+  { key: 'brot', label: '🥐 Brot & Gebäck' },
+  { key: 'herzhaft', label: '🧀 Herzhaft' },
+  { key: 'suess', label: '🍫 Süßes' },
+  { key: 'obst', label: '🍎 Obst & Gemüse' },
+  { key: 'getraenke', label: '🥤 Getränke' },
+  { key: 'sonstiges', label: '📦 Sonstiges' },
+];
+const CAT_LABEL = Object.fromEntries(CATS.map((c) => [c.key, c.label]));
+// Reihenfolge der Prüfung ist wichtig: „Apfelsaft“ = Getränk, „Erdbeermarmelade“ = Süßes
+const CAT_WORDS = [
+  ['getraenke', /saft|tee\b|^tee|wasser|cola|limo|sprite|fanta|milch|kakao|kaffee|smoothie|getraenk|schorle|capri|sirup|mate\b|drink|energy/],
+  ['suess', /nutella|marmelade|konfituere|honig|schoko|kuchen|muffin|keks|cookie|donut|gummi|suess|haribo|waffel|pfannkuchen|crepe|pudding|joghurt|muesli|cornflakes|cerealien|creme|\beis\b|brownie|zucker|bonbon|nougat/],
+  ['herzhaft', /kaese|wurst|salami|schinken|\beier?\b|mozz?arell|butter|aufschnitt|hummus|frikadell|wuerstchen|pizza|quiche|chips|salzstang|cracker|\bdip|lachs|thunfisch|pesto|olive|nugget|aufstrich|ruehrei|speck/],
+  ['brot', /broetchen|brot|brezel|breze|toast|croissant|baguette|semmel|laugen|zopf|bagel|wrap|hoernchen|ciabatta|knaecke|fladen|gebaeck|schnecke/],
+  ['obst', /banane|apfel|aepfel|beere|erdbeer|traube|melone|orange|mandarine|clementine|kiwi|ananas|mango|obst|gemuese|gurke|tomate|paprika|karotte|moehre|salat|birne|pfirsich|kirsche|radieschen|rohkost|avocado/],
+];
+function norm(t) {
+  return String(t || '').toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]+/g, ' ').trim();
+}
+function autoCat(what) {
+  const n = norm(what);
+  return (CAT_WORDS.find(([, re]) => re.test(n)) || ['sonstiges'])[0];
+}
+const catOf = (i) => i.category || autoCat(i.what);
+
+// ---- Doppelte erkennen ----
+const STOP = new Set(['und', 'mit', 'oder', 'von', 'ein', 'eine', 'einen', 'der', 'die', 'das', 'fuer', 'paar', 'viel', 'stueck', 'packung', 'flasche', 'flaschen']);
+function words(t) {
+  return norm(t).split(' ').filter((w) => w.length >= 3 && !STOP.has(w) && !/^\d+$/.test(w))
+    .map((w) => (w.length > 4 ? w.replace(/(en|n|s|e)$/, '') : w));
+}
+function findSimilar(list, what) {
+  const mine = words(what);
+  if (!mine.length) return null;
+  return list.items.find((i) => {
+    const theirs = words(i.what);
+    // Zusammengesetzte Wörter: das letzte Wort zählt (Apfel-saft ist ein Saft)
+    return mine.some((a) => theirs.some((b) => a === b || (a.length >= 4 && b.endsWith(a)) || (b.length >= 4 && a.endsWith(b))));
+  }) || null;
+}
+
+// ---- Sortieren ----
+const SORTS = { cat: '🏷️ Kategorie', az: '🔤 A–Z', who: '👤 Person', new: '🕒 Neueste' };
+const sortOf = (id) => store.get('sort:' + id) || 'cat';
+function sortItems(items, mode) {
+  const a = items.map((i, idx) => ({ i, idx }));
+  const cmp = (x, y) => x.localeCompare(y, 'de', { sensitivity: 'base' });
+  if (mode === 'az') a.sort((x, y) => cmp(x.i.what, y.i.what));
+  else if (mode === 'who') a.sort((x, y) => (!x.i.who - !y.i.who) || cmp(x.i.who || '', y.i.who || '') || x.idx - y.idx);
+  else if (mode === 'new') a.sort((x, y) => y.idx - x.idx);
+  return a.map((x) => x.i);
+}
+
+function itemHtml(i, admin) {
+  const own = i.mine ?? (i.owner === me?.uid);
+  const mine = admin || own;
+  const adminLine = admin ? `<span class="dev-line">
+      ${i.device ? `<span class="dev" style="background:${colorFor(i.device)}" title="Gleiche Farbe = gleiches Gerät">#${i.device}</span>${i.blocked ? ' gesperrt' : ''}` : ''}
+      <button class="cat-chip" data-action="setCat" title="Kategorie ändern: ${CAT_LABEL[catOf(i)]}">🏷️</button>
+    </span>` : '';
+  return `
+    <li class="${i.done ? 'done' : ''} ${i.blocked ? 'is-blocked' : ''} ${own && !admin ? 'mine-row' : ''}" data-item="${i.id}">
+      <button class="check" ${mine ? 'data-action="toggle"' : 'disabled title="Nur die Person, die das eingetragen hat, kann abhaken"'} aria-label="Abhaken">✓</button>
+      <span class="what">${esc(i.what)}${adminLine}</span>
+      ${i.who ? `<span class="who"><span class="avatar" style="background:${colorFor(i.who)}">${esc(initials(i.who))}</span><span>${esc(i.who)}</span></span>` : ''}
+      ${admin && !own && i.device ? (i.blocked ? `<span class="block" title="Gerät ist gesperrt">🚫</span>`
+        : `<button class="block" data-action="blockDevice" title="Dieses Gerät sperren">🚫</button>`) : ''}
+      ${mine ? `<button class="del" data-action="delItem" title="Entfernen">✕</button>` : `<span class="del-space"></span>`}
+    </li>`;
+}
+
+function itemsHtml(l, items, admin) {
+  const mode = sortOf(l.id);
+  if (mode !== 'cat') return sortItems(items, mode).map((i) => itemHtml(i, admin)).join('');
+  const groups = CATS.map((c) => ({ c, items: items.filter((i) => catOf(i) === c.key) })).filter((g) => g.items.length);
+  if (groups.length <= 1) return items.map((i) => itemHtml(i, admin)).join('');
+  return groups.map((g) => `<li class="cat-head"><span>${g.c.label}</span><span>${g.items.length}</span></li>`
+    + g.items.map((i) => itemHtml(i, admin)).join('')).join('');
+}
+
 function render() {
   const admin = me?.role === 'admin';
   $('#empty').classList.toggle('hidden', lists.length > 0);
   $('#subtitle').textContent = `${lists.length} ${lists.length === 1 ? 'Liste' : 'Listen'}`;
   const sorted = [...lists].sort((a, b) => (a.hidden - b.hidden));
   $('#blockedBanner').classList.toggle('hidden', !me?.blocked);
-  $('#lists').innerHTML = sorted.map((l) => {
+  const q = norm($('#search').value);
+  const hit = (i) => !q || norm(i.what + ' ' + i.who).includes(q);
+  $('#searchBox').classList.toggle('hidden', !lists.some((l) => l.items.length));
+  $('#searchClear').classList.toggle('hidden', !q);
+  const shown = sorted.filter((l) => !q || l.items.some(hit));
+  $('#lists').innerHTML = (q && !shown.length) ? `<div class="no-hits glass list">Keine Treffer für „${esc($('#search').value)}“</div>` : shown.map((l) => {
     const total = l.items.length, done = l.items.filter((i) => i.done).length;
+    const visible = l.items.filter(hit);
     const pct = total ? Math.round((done / total) * 100) : 0;
     return `
     <article class="list glass ${l.hidden ? 'is-hidden' : ''}" data-list="${l.id}">
@@ -522,20 +645,11 @@ function render() {
       ${total ? `
         <div class="progress"><div style="width:${pct}%"></div></div>
         <div class="progress-label">${done} von ${total} erledigt${pct === 100 ? ' 🎉' : ''}</div>` : ''}
+      ${total > 1 ? `<div class="list-tools"><select class="sort-select" data-sort-list="${l.id}" aria-label="Sortieren">
+        ${Object.entries(SORTS).map(([k, v]) => `<option value="${k}" ${sortOf(l.id) === k ? 'selected' : ''}>${v}</option>`).join('')}
+      </select></div>` : ''}
       <ul>
-        ${l.items.map((i) => {
-          const own = i.mine ?? (i.owner === me?.uid);
-          const mine = admin || own;
-          return `
-          <li class="${i.done ? 'done' : ''} ${i.blocked ? 'is-blocked' : ''}" data-item="${i.id}">
-            <button class="check" ${mine ? 'data-action="toggle"' : 'disabled title="Nur die Person, die das eingetragen hat, kann abhaken"'} aria-label="Abhaken">✓</button>
-            <span class="what">${esc(i.what)}${admin && i.device ? `<span class="dev-line"><span class="dev" style="background:${colorFor(i.device)}" title="Gleiche Farbe = gleiches Gerät">#${i.device}</span>${i.blocked ? ' gesperrt' : ''}</span>` : ''}</span>
-            ${i.who ? `<span class="who"><span class="avatar" style="background:${colorFor(i.who)}">${esc(initials(i.who))}</span><span>${esc(i.who)}</span></span>` : ''}
-            ${admin && !own && i.device ? (i.blocked ? `<span class="block" title="Gerät ist gesperrt">🚫</span>`
-              : `<button class="block" data-action="blockDevice" title="Dieses Gerät sperren">🚫</button>`) : ''}
-            ${mine ? `<button class="del" data-action="delItem" title="Entfernen">✕</button>` : `<span class="del-space"></span>`}
-          </li>`;
-        }).join('') || `<li class="empty-items" style="display:block">Noch nichts eingetragen – sei die/der Erste! 🙌</li>`}
+        ${itemsHtml(l, visible, admin) || `<li class="empty-items" style="display:block">Noch nichts eingetragen – sei die/der Erste! 🙌</li>`}
       </ul>
       ${me?.blocked ? '' : `<form class="add-row">
         <input name="what" placeholder="Was? (z. B. Brötchen)" required maxlength="150">
@@ -591,6 +705,31 @@ $('#loginForm').addEventListener('submit', async (e) => {
 });
 
 $('#logout').addEventListener('click', async () => { await rpc('logout', {}, { silent: true }).catch(() => {}); store.set(TOKEN_KEY, null); showLogin(); });
+
+// ---- Suche / Sortierung / Kategorie ----
+$('#search').addEventListener('input', render);
+$('#searchClear').addEventListener('click', () => { $('#search').value = ''; render(); });
+$('#lists').addEventListener('change', (e) => {
+  const sel = e.target.closest('[data-sort-list]'); if (!sel) return;
+  store.set('sort:' + sel.dataset.sortList, sel.value); render();
+});
+let catTarget = null;
+function openCatDialog(item) {
+  catTarget = item;
+  $('#catItemName').textContent = `„${item.what}“ – automatisch erkannt: ${CAT_LABEL[autoCat(item.what)]}`;
+  $('#catGrid').innerHTML = `<button type="button" data-cat="" class="${item.category ? '' : 'sel'}">✨ Automatisch</button>`
+    + CATS.map((c) => `<button type="button" data-cat="${c.key}" class="${item.category === c.key ? 'sel' : ''}">${c.label}</button>`).join('');
+  $('#catDialog').showModal();
+}
+$('#catClose').addEventListener('click', () => $('#catDialog').close());
+$('#catGrid').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-cat]'); if (!b || !catTarget) return;
+  try {
+    await rpc('set_item_category', { p_id: catTarget.id, p_category: b.dataset.cat });
+    catTarget.category = b.dataset.cat;
+    $('#catDialog').close(); render(); toast('🏷️ Kategorie geändert');
+  } catch {}
+});
 
 // ---- Papierkorb ----
 async function restore(fn, id) {
@@ -695,6 +834,11 @@ $('#lists').addEventListener('submit', async (e) => {
   try {
     const who = f.who.value.trim();
     if (who) store.set('name', who);
+    const list = lists.find((l) => l.id === listId);
+    const dup = findSimilar(list, f.what.value);
+    if (dup && !confirm(`„${dup.what}“ steht schon auf der Liste${dup.who ? ` (bringt ${dup.who} mit)` : ''}.\n\nTrotzdem eintragen?`)) {
+      btn.disabled = false; return;
+    }
     const item = await rpc('add_item', { p_list_id: listId, p_what: f.what.value, p_who: who });
     lists.find((l) => l.id === listId).items.push(item);
     render();
@@ -723,6 +867,8 @@ $('#lists').addEventListener('click', async (e) => {
       await rpc('set_item_done', { p_id: itemId, p_done: !item.done });
       item.done = !item.done;
       if (item.done && list.items.every((i) => i.done)) { confetti(); toast('🎉 Alles erledigt!'); }
+    } else if (action === 'setCat') {
+      return openCatDialog(list.items.find((i) => i.id === itemId));
     } else if (action === 'blockDevice') {
       const item = list.items.find((i) => i.id === itemId);
       if (!confirm(`Das Gerät, das „${item.what}“ eingetragen hat, sperren? Es kann dann nichts mehr eintragen.`)) return;
@@ -741,7 +887,7 @@ $('#lists').addEventListener('click', async (e) => {
 
 // Alle 15 Sekunden aktualisieren (nicht während man tippt)
 setInterval(() => {
-  if (me && !IS_SUPER && !document.activeElement.matches('input') && !$('#listDialog').open && !$('#trashDialog').open) rpc('get_lists', {}, { silent: true }).then((l) => { lists = l; render(); }).catch(() => {});
+  if (me && !IS_SUPER && !document.activeElement.matches('input') && !$('#listDialog').open && !$('#trashDialog').open && !$('#catDialog').open) rpc('get_lists', {}, { silent: true }).then((l) => { lists = l; render(); }).catch(() => {});
 }, 15000);
 
 // ================= Admin-Startseite (/admin) =================
