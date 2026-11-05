@@ -37,3 +37,12 @@ Passwörter stehen **nicht** im Code – nur als bcrypt-Hash in der Datenbank. A
    ```
 3. In `index.html` `SUPABASE_URL` und `SUPABASE_KEY` (Publishable Key) eintragen.
 4. GitHub Pages aktivieren. `404.html` sorgt dafür, dass Links wie `/klasse7b` funktionieren.
+
+## Quellen
+Die Wortliste für die automatischen Kategorien (`kategorien.js`) stammt aus den
+[Open Food Facts](https://world.openfoodfacts.org)-Taxonomien
+([openfoodfacts-server](https://github.com/openfoodfacts/openfoodfacts-server), `taxonomies/food/categories.txt`
+und `ingredients.txt`), © Open Food Facts Mitwirkende, Lizenz
+[Open Database License (ODbL) 1.0](https://opendatacommons.org/licenses/odbl/1-0/).
+Die eigene, handgepflegte Stichwortliste in `index.html` hat Vorrang; die Open-Food-Facts-Liste wird genutzt,
+wenn sie nichts findet.

@@ -412,6 +412,7 @@
 
 <div id="toast" class="glass"><span></span><button type="button"></button></div>
 
+<script src="kategorien.js"></script>
 <script>
 const $ = (s) => document.querySelector(s);
 let lists = [];
@@ -539,18 +540,38 @@ const CAT_LABEL = Object.fromEntries(CATS.map((c) => [c.key, c.label]));
 // Reihenfolge der Prüfung ist wichtig: „Apfelsaft“ = Getränk, „Erdbeermarmelade“ = Süßes
 const CAT_WORDS = [
   ['getraenke', /saft|tee\b|^tee|wasser|cola|limo|sprite|fanta|milch|kakao|kaffee|smoothie|getraenk|schorle|capri|sirup|mate\b|drink|energy/],
-  ['suess', /nutella|marmelade|konfituere|honig|schoko|kuchen|muffin|keks|cookie|donut|gummi|suess|haribo|waffel|pfannkuchen|crepe|pudding|joghurt|muesli|cornflakes|cerealien|creme|\beis\b|brownie|zucker|bonbon|nougat/],
-  ['herzhaft', /kaese|wurst|salami|schinken|\beier?\b|mozz?arell|butter|aufschnitt|hummus|frikadell|wuerstchen|pizza|quiche|chips|salzstang|cracker|\bdip|lachs|thunfisch|pesto|olive|nugget|aufstrich|ruehrei|speck/],
+  ['suess', /nutella|marmelade|konfituere|honig|schoko|kuchen|muffin|keks|cookie|donut|gummi|suess|haribo|waffel|pfannkuchen|crepe|pudding|joghurt|muesli|cornflakes|cerealien|creme|\beis\b|brownie|zucker|bonbon|nougat|popcorn|fruchtzwerg|marshmallow|lolli|kaugummi|zimt/],
+  ['herzhaft', /kaese|wurst|salami|schinken|\beier?\b|mozz?arell|butter|aufschnitt|hummus|frikadell|wuerstchen|pizza|quiche|chips|salzstang|cracker|\bdip|lachs|thunfisch|pesto|olive|nugget|aufstrich|ruehrei|speck|haehnchen|huhn|chicken|nuss|nuess|wiener|bockwurst|tofu|falafel/],
   ['brot', /broetchen|brot|brezel|breze|toast|croissant|baguette|semmel|laugen|zopf|bagel|wrap|hoernchen|ciabatta|knaecke|fladen|gebaeck|schnecke/],
-  ['obst', /banane|apfel|aepfel|beere|erdbeer|traube|melone|orange|mandarine|clementine|kiwi|ananas|mango|obst|gemuese|gurke|tomate|paprika|karotte|moehre|salat|birne|pfirsich|kirsche|radieschen|rohkost|avocado/],
+  ['obst', /banane|apfel|aepfel|beere|erdbeer|traube|melone|orange|mandarine|clementine|kiwi|ananas|mango|obst|gemuese|gurke|tomate|paprika|karotte|moehre|salat|birne|pfirsich|kirsche|radieschen|rohkost|avocado|mais\b|^mais|dattel|feige|pflaume|zitrone|limette|brokkoli|blumenkohl|zucchini|moehrchen/],
 ];
 function norm(t) {
   return String(t || '').toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
     .replace(/[^a-z0-9]+/g, ' ').trim();
 }
+// Große Wortliste von Open Food Facts (kategorien.js) als Ergänzung, wenn die eigene Liste nichts findet
+let OFF_MAP = null;
+function offMap() {
+  if (!OFF_MAP) {
+    OFF_MAP = new Map();
+    for (const [c, str] of Object.entries(window.OFF_WORDS || {})) for (const w of str.split('|')) OFF_MAP.set(w, c);
+  }
+  return OFF_MAP;
+}
+function dictCat(n) {
+  const m = offMap();
+  for (const tok of n.split(' ')) {
+    if (tok.length < 3) continue;
+    for (const f of [tok, tok.replace(/(en|n|s|e)$/, ''), tok + 'n', tok + 'en', tok + 'e', tok + 's']) if (m.has(f)) return m.get(f);
+    // Zusammengesetzte Wörter: hinteren Teil prüfen (Vollkornbrötchen → brötchen), längster zuerst
+    for (let k = 1; k <= tok.length - 4; k++) { const tail = tok.slice(k); if (m.has(tail)) return m.get(tail); }
+  }
+  return null;
+}
 function autoCat(what) {
   const n = norm(what);
-  return (CAT_WORDS.find(([, re]) => re.test(n)) || ['sonstiges'])[0];
+  const own = CAT_WORDS.find(([, re]) => re.test(n));
+  return own ? own[0] : (dictCat(n) || 'sonstiges');
 }
 const catOf = (i) => i.category || autoCat(i.what);
 
