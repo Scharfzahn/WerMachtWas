@@ -80,13 +80,34 @@
   @keyframes shake { 25% { transform: translateX(-8px); } 50% { transform: translateX(8px); } 75% { transform: translateX(-4px); } }
 
   /* Header */
-  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
-  .brand { display: flex; align-items: center; gap: 12px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 22px; min-width: 0; }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1 1 auto; }
+  .brand > div { min-width: 0; }
   .brand .logo { font-size: 38px; }
   .brand h1 { margin: 0; font-size: 1.6rem; line-height: 1.1; letter-spacing: -.02em; }
   .grad-text { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .brand small { color: var(--muted); }
-  .head-right { display: flex; align-items: center; gap: 8px; }
+  .brand small { color: var(--muted); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .head-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+  .logout-btn { display: inline-flex; align-items: center; gap: 6px; }
+  .lo-ico { display: none; font-size: 1rem; line-height: 1; }
+  @media (max-width: 480px) {
+    .brand { gap: 8px; }
+    .brand .logo { font-size: 30px; }
+    .brand h1 { font-size: 1.3rem; }
+    .badge { padding: 4px 9px; font-size: .68rem; letter-spacing: .02em; }
+    .logout-btn { padding: 7px 10px; }
+    .lo-txt { display: none; }
+    .lo-ico { display: inline; }
+  }
+  @media (max-width: 360px) { .brand h1 { font-size: 1.12rem; } .brand .logo { font-size: 26px; } }
+  li .who { min-width: 0; flex: 0 1 auto; }
+  @media (max-width: 380px) {
+    main { padding-left: 12px; padding-right: 12px; }
+    .list { padding: 16px 14px; }
+    li { gap: 8px; padding: 9px 8px; }
+    .del, .block, .del-space { width: 26px; }
+    .who { max-width: 38%; }
+  }
   .badge { padding: 5px 11px; border-radius: 999px; font-size: .75rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
   .badge.admin { background: var(--grad); color: #1a0b1f; }
   .badge.user { background: var(--glass-strong); border: 1px solid var(--border); color: var(--muted); }
@@ -278,7 +299,7 @@
       </div>
       <div class="head-right">
         <span id="roleBadge" class="badge"></span>
-        <button class="chip-btn" id="logout">Logout</button>
+        <button class="chip-btn logout-btn" id="logout" aria-label="Logout" title="Logout"><span class="lo-ico">🚪</span><span class="lo-txt">Logout</span></button>
       </div>
     </header>
 
@@ -337,7 +358,7 @@
       </div>
       <div class="head-right">
         <span class="badge admin">👑 Admin</span>
-        <button class="chip-btn" id="superLogout">Logout</button>
+        <button class="chip-btn logout-btn" id="superLogout" aria-label="Logout" title="Logout"><span class="lo-ico">🚪</span><span class="lo-txt">Logout</span></button>
       </div>
     </header>
 
@@ -368,7 +389,7 @@
     </label>
     <div class="field-label">Emoji</div>
     <div id="serverEmojiPicker" class="emoji-picker"></div>
-    <label>Schüler*innen-Passwort<input name="userPw" type="text" autocomplete="off" maxlength="100"></label>
+    <label>Passwort für alle<input name="userPw" type="text" autocomplete="off" maxlength="100"></label>
     <label>Admin-Passwort (darf Listen erstellen)<input name="adminPw" type="text" autocomplete="off" maxlength="100"></label>
     <div class="hint" id="pwHint"></div>
     <div class="dialog-actions">
@@ -490,7 +511,8 @@ function showApp() {
   $('#adminPanel').classList.toggle('hidden', !admin);
   $('#trashBtn').classList.toggle('hidden', !admin);
   $('#roleBadge').className = 'badge ' + (admin ? 'admin' : 'user');
-  $('#roleBadge').textContent = admin ? '👑 Admin' : 'Schüler*in';
+  $('#roleBadge').textContent = '👑 Admin';
+  $('#roleBadge').classList.toggle('hidden', !admin);
   $('#emptyText').textContent = admin ? 'Erstell oben die erste Liste!' : 'Sobald ein Admin eine Liste erstellt, taucht sie hier auf.';
 }
 
@@ -521,7 +543,7 @@ function daysUntilHidden(l) {
   return Math.ceil((end - new Date()) / 86400000);
 }
 function statusTag(l, admin) {
-  if (l.hidden) return admin ? `<div class="meta"><span class="tag hid">👁️ Für Schüler*innen ausgeblendet</span></div>` : '';
+  if (l.hidden) return admin ? `<div class="meta"><span class="tag hid">👁️ Nur noch für Admins sichtbar</span></div>` : '';
   if (!l.expired) return '';
   const d = daysUntilHidden(l);
   return `<div class="meta"><span class="tag over">⏰ Vorbei · noch ${d} ${d === 1 ? 'Tag' : 'Tage'} sichtbar</span></div>`;

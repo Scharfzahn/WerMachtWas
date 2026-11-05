@@ -16,7 +16,7 @@ Die Verwaltung nutzt ein eigenes **Haupt-Admin-Passwort** (anfangs gleich dem Ad
 Haupt-Servers – auf der Admin-Seite unten ändern!).
 
 ## Rollen pro Server
-- **Schüler*innen**: Einträge hinzufügen, **eigene** Einträge abhaken und löschen
+- **Mitglieder**: Einträge hinzufügen, **eigene** Einträge abhaken und löschen
 - **Admins**: zusätzlich Listen erstellen, **bearbeiten** (Name, Datum, Notiz, Emoji) und löschen, alle Einträge abhaken und löschen
 - Nach dem Datum bleibt eine Liste noch 5 Tage stehen, danach sehen sie nur noch Admins
 - Papierkorb: Nach dem Löschen kurz „Rückgängig“, Admins können Gelöschtes 7 Tage lang wiederherstellen
