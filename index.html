@@ -34,18 +34,35 @@
     min-height: 100%; margin: 0; font-family: var(--font); color: var(--text); background: transparent;
     overflow-x: hidden;
   }
-  /* animierte Farbblobs im Hintergrund */
-  /* So hoch wie der größtmögliche Bildschirm (iOS: Leiste eingeklappt), plus Puffer */
-  .blobs { position: fixed; top: -10vh; left: 0; right: 0; height: 125vh; height: calc(100lvh + 20vh); z-index: -1; overflow: hidden; pointer-events: none; opacity: .75;
-    /* --scroll (0 oben … 1 unten) wird per JS gesetzt: Farben verschieben sich beim Scrollen */
-    filter: blur(70px) hue-rotate(calc(var(--scroll, 0) * -70deg)) saturate(calc(1 + var(--scroll, 0) * .25)); }
-  .blobs span { position: absolute; width: 50vmax; height: 50vmax; border-radius: 50%; animation: float 22s ease-in-out infinite alternate; }
-  .blobs span:nth-child(1) { background: #7c3aed; top: -20vmax; left: -15vmax; translate: calc(var(--scroll, 0) * 18vw) calc(var(--scroll, 0) * 30vh); }
-  .blobs span:nth-child(2) { background: #db2777; bottom: -25vmax; right: -15vmax; animation-delay: -7s; translate: calc(var(--scroll, 0) * -12vw) calc(var(--scroll, 0) * -22vh); }
-  .blobs span:nth-child(3) { background: #ea580c; top: 30%; left: 40%; width: 30vmax; height: 30vmax; opacity: .6; animation-delay: -14s; translate: calc(var(--scroll, 0) * -30vw) calc(var(--scroll, 0) * 12vh); }
+  /* Animierte Farbflecken im Hintergrund.
+     --scroll (0 oben … 1 unten) kommt per JS: oben „Sonnenuntergang“ (Lila/Pink/Orange),
+     unten „Polarlicht“ (Türkis/Blau/Violett). Die Flecken wandern dabei mit. */
+  .blobs {
+    position: fixed; top: -10vh; left: 0; right: 0; height: 125vh; height: calc(100lvh + 20vh);
+    z-index: -1; overflow: hidden; pointer-events: none; opacity: .9;
+    filter: blur(64px) saturate(1.2);
+    --s: calc(var(--scroll, 0) * 100%);
+  }
+  .blobs span { position: absolute; border-radius: 50%; animation: float 22s ease-in-out infinite alternate; }
+  .blobs span:nth-child(1) { background: #7c3aed; width: 55vmax; height: 55vmax; top: -22vmax; left: -18vmax;
+    translate: calc(var(--scroll, 0) * 35vw) calc(var(--scroll, 0) * 45vh); }
+  .blobs span:nth-child(2) { background: #db2777; width: 50vmax; height: 50vmax; bottom: -22vmax; right: -18vmax; animation-delay: -7s;
+    translate: calc(var(--scroll, 0) * -30vw) calc(var(--scroll, 0) * -40vh); }
+  .blobs span:nth-child(3) { background: #f97316; width: 32vmax; height: 32vmax; top: 28%; left: 42%; opacity: .75; animation-delay: -14s;
+    translate: calc(var(--scroll, 0) * -45vw) calc(var(--scroll, 0) * 20vh); scale: calc(1 - var(--scroll, 0) * .35); }
+  /* Steigt beim Scrollen von unten auf */
+  .blobs span:nth-child(4) { background: #22d3ee; width: 40vmax; height: 40vmax; bottom: -40vmax; left: 10%; animation-delay: -4s; animation-duration: 17s;
+    opacity: calc(.1 + var(--scroll, 0) * .6); translate: calc(var(--scroll, 0) * 20vw) calc(var(--scroll, 0) * -75vh); }
+  /* Farbwechsel beim Scrollen – nur wo der Browser Farbmischung kann (iOS ab 16.2), sonst feste Farben */
+  @supports (background: color-mix(in oklab, red, blue 50%)) {
+    .blobs span:nth-child(1) { background: color-mix(in oklab, #7c3aed, #2563eb var(--s)); }
+    .blobs span:nth-child(2) { background: color-mix(in oklab, #db2777, #c026d3 var(--s)); }
+    .blobs span:nth-child(3) { background: color-mix(in oklab, #f97316, #14b8a6 var(--s)); }
+  }
+  /* Nur ganz unten in die Farbe der Safari-Leiste auslaufen lassen (--edge) */
   .edge-fade {
-    position: fixed; left: 0; right: 0; bottom: 0; height: 28vh; z-index: -1; pointer-events: none;
-    background: linear-gradient(to bottom, rgba(42,15,51,0) 0%, rgba(42,15,51,.75) 55%, var(--edge) 100%);
+    position: fixed; left: 0; right: 0; bottom: 0; height: 90px; z-index: -1; pointer-events: none;
+    background: linear-gradient(to bottom, rgba(42,15,51,0) 0%, rgba(42,15,51,.55) 45%, var(--edge) 100%);
   }
   @keyframes float { to { transform: translate(8vmax, 6vmax) scale(1.15); } }
 
@@ -285,7 +302,7 @@
 </style>
 </head>
 <body>
-<div class="blobs"><span></span><span></span><span></span></div>
+<div class="blobs"><span></span><span></span><span></span><span></span></div>
 <div class="edge-fade"></div>
 
 <main>
