@@ -51,13 +51,13 @@
   .blobs span:nth-child(3) { background: #f97316; width: 32vmax; height: 32vmax; top: 28%; left: 42%; opacity: .75; animation-delay: -14s;
     translate: calc(var(--scroll, 0) * -45vw) calc(var(--scroll, 0) * 20vh); scale: calc(1 - var(--scroll, 0) * .35); }
   /* Steigt beim Scrollen von unten auf */
-  .blobs span:nth-child(4) { background: #22d3ee; width: 40vmax; height: 40vmax; bottom: -40vmax; left: 10%; animation-delay: -4s; animation-duration: 17s;
-    opacity: calc(.1 + var(--scroll, 0) * .6); translate: calc(var(--scroll, 0) * 20vw) calc(var(--scroll, 0) * -75vh); }
+  .blobs span:nth-child(4) { background: #1de9c3; width: 52vmax; height: 34vmax; bottom: -40vmax; left: 0; animation-delay: -4s; animation-duration: 17s;
+    opacity: calc(.1 + var(--scroll, 0) * .75); translate: calc(var(--scroll, 0) * 12vw) calc(var(--scroll, 0) * -70vh); }
   /* Farbwechsel beim Scrollen – nur wo der Browser Farbmischung kann (iOS ab 16.2), sonst feste Farben */
   @supports (background: color-mix(in oklab, red, blue 50%)) {
     .blobs span:nth-child(1) { background: color-mix(in oklab, #7c3aed, #2563eb var(--s)); }
     .blobs span:nth-child(2) { background: color-mix(in oklab, #db2777, #c026d3 var(--s)); }
-    .blobs span:nth-child(3) { background: color-mix(in oklab, #f97316, #14b8a6 var(--s)); }
+    .blobs span:nth-child(3) { background: color-mix(in oklab, #f97316, #2dd4bf var(--s)); }
   }
   /* Nur ganz unten in die Farbe der Safari-Leiste auslaufen lassen (--edge) */
   /* Liegt ÜBER den Inhalten: Karten laufen unten weich in die Leistenfarbe aus statt hart abgeschnitten zu werden.
@@ -1131,9 +1131,9 @@ document.querySelectorAll('[data-base-link]').forEach((a) => { a.href = BASE; })
     const max = document.documentElement.scrollHeight - innerHeight;
     const p = max > 0 ? Math.min(1, Math.max(0, scrollY / max)) : 0;
     document.documentElement.style.setProperty('--scroll', p.toFixed(3));
-    // Farbe für die Safari-Leiste: von dunklem Lila (oben) zu dunklem Nachtblau (unten)
+    // Farbe für die Safari-Leiste: von dunklem Lila (oben) zu dunklem Petrol (unten)
     const mix = (a, b) => Math.round(a + (b - a) * p);
-    const edge = `rgb(${mix(42, 14)}, ${mix(15, 26)}, ${mix(51, 64)})`;
+    const edge = `rgb(${mix(42, 8)}, ${mix(15, 36)}, ${mix(51, 56)})`;
     document.documentElement.style.setProperty('--edge', edge);
     if (themeMeta) themeMeta.content = edge;
   };
