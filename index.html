@@ -26,10 +26,10 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   /* Grundverlauf auf <html>: der füllt auch die Fläche unter der Safari-Leiste und beim Überscrollen,
      damit es dort nie schwarz wird. Die Farbe am Ende passt zum pinken Fleck unten. */
-  html {
-    min-height: 100%;
-    background: #2a0f33 linear-gradient(180deg, #160c2e 0%, #1d0d35 45%, #2a0f33 100%) no-repeat;
-  }
+  /* Safari (iPhone) füllt den Bereich seiner unteren Leiste mit EINER Farbe, die es von der Seite nimmt.
+     Darum läuft der Hintergrund unten weich in genau diese Farbe aus (--edge) – dann gibt es keine Kante. */
+  :root { --edge: #2a0f33; }
+  html { min-height: 100%; background: var(--edge); }
   body {
     min-height: 100%; margin: 0; font-family: var(--font); color: var(--text); background: transparent;
     overflow-x: hidden;
@@ -41,6 +41,10 @@
   .blobs span:nth-child(1) { background: #7c3aed; top: -20vmax; left: -15vmax; }
   .blobs span:nth-child(2) { background: #db2777; bottom: -25vmax; right: -15vmax; animation-delay: -7s; }
   .blobs span:nth-child(3) { background: #ea580c; top: 30%; left: 40%; width: 30vmax; height: 30vmax; opacity: .6; animation-delay: -14s; }
+  .edge-fade {
+    position: fixed; left: 0; right: 0; bottom: 0; height: 28vh; z-index: -1; pointer-events: none;
+    background: linear-gradient(to bottom, rgba(42,15,51,0) 0%, rgba(42,15,51,.75) 55%, var(--edge) 100%);
+  }
   @keyframes float { to { transform: translate(8vmax, 6vmax) scale(1.15); } }
 
   main { max-width: 760px; margin: 0 auto; padding: max(20px, env(safe-area-inset-top)) 16px 80px; }
@@ -280,6 +284,7 @@
 </head>
 <body>
 <div class="blobs"><span></span><span></span><span></span></div>
+<div class="edge-fade"></div>
 
 <main>
   <!-- Login -->
