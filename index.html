@@ -268,6 +268,10 @@
   .cat-grid button.sel { border-color: var(--pink); background: rgba(255,95,162,.18); }
   .cat-grid button:hover { background: var(--glass-strong); }
   .no-hits { text-align: center; color: var(--muted); padding: 30px 0; }
+  .show-row { display: flex; gap: 8px; align-items: center; }
+  .show-row input { flex: 1; color-scheme: dark; min-width: 0; }
+  .show-row .chip-btn { flex: 0 0 auto; padding: 10px 14px; }
+  .tag.sched { background: rgba(139,92,246,.25); color: #c4b5fd; }
   .kind-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .kind-picker button { padding: 12px; border-radius: 12px; background: rgba(0,0,0,.25); border: 2px solid transparent; text-align: left; display: grid; gap: 4px; }
   .kind-picker button small { color: var(--muted); font-size: .78rem; }
@@ -475,6 +479,10 @@
       <label class="date-hint">Nach dem Datum bleibt die Liste noch 5 Tage für alle sichtbar.</label>
     </div>
     <label>Notiz<input name="note" placeholder="optional, z. B. „Bitte bis Donnerstag eintragen“" maxlength="500"></label>
+    <label>Sichtbar ab <span class="hint">(optional)</span>
+      <div class="show-row"><input name="showFrom" type="datetime-local"><button type="button" class="chip-btn" id="showFromClear">Sofort</button></div>
+      <span class="hint" id="showFromHint">Leer = sofort für alle sichtbar. Admins sehen die Liste immer.</span>
+    </label>
     <div class="dialog-actions">
       <button type="button" class="chip-btn" id="dialogCancel">Abbrechen</button>
       <button type="submit" class="btn" id="dialogSave">Speichern</button>
@@ -608,6 +616,7 @@ function daysUntilHidden(l) {
   return Math.ceil((end - new Date()) / 86400000);
 }
 function statusTag(l, admin) {
+  if (l.scheduled) return admin ? `<div class="meta"><span class="tag sched">🕒 Erscheint ${fmtWhen(l.show_from)} Uhr</span></div>` : '';
   if (l.hidden) return admin ? `<div class="meta"><span class="tag hid">👁️ Nur noch für Admins sichtbar</span></div>` : '';
   if (!l.expired) return '';
   const d = daysUntilHidden(l);
@@ -754,7 +763,7 @@ function render() {
   const admin = me?.role === 'admin';
   $('#empty').classList.toggle('hidden', lists.length > 0);
   $('#subtitle').textContent = `${lists.length} ${lists.length === 1 ? 'Liste' : 'Listen'}`;
-  const sorted = [...lists].sort((a, b) => (a.hidden - b.hidden));
+  const sorted = [...lists].sort((a, b) => (a.hidden - b.hidden) || (!!a.scheduled - !!b.scheduled));
   $('#blockedBanner').classList.toggle('hidden', !me?.blocked);
   const q = norm($('#search').value);
   const hit = (i) => !q || norm(i.what + ' ' + i.who).includes(q);
@@ -766,7 +775,7 @@ function render() {
     const visible = l.items.filter(hit);
     const pct = total ? Math.round((done / total) * 100) : 0;
     return `
-    <article class="list glass ${l.hidden ? 'is-hidden' : ''}" data-list="${l.id}">
+    <article class="list glass ${l.hidden || l.scheduled ? 'is-hidden' : ''}" data-list="${l.id}">
       <div class="list-head">
         <div class="list-emoji">${l.emoji || (l.kind === 'info' ? '📌' : emojiFor(l.title))}</div>
         <div class="list-info">
@@ -951,6 +960,23 @@ $('#emojiPicker').addEventListener('click', (e) => {
 });
 
 let pickedKind = 'normal';
+// ISO-Zeit -> Wert für <input type="datetime-local"> in Ortszeit
+function toLocalInput(iso) {
+  const d = new Date(iso), z = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`;
+}
+function fmtWhen(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) + ' um '
+    + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+function updateShowFromHint() {
+  const v = $('#listForm').showFrom.value;
+  $('#showFromHint').textContent = v ? `Mitglieder sehen die Liste erst ab ${fmtWhen(new Date(v).toISOString())} Uhr.`
+    : 'Leer = sofort für alle sichtbar. Admins sehen die Liste immer.';
+}
+$('#listForm').showFrom.addEventListener('input', updateShowFromHint);
+$('#showFromClear').addEventListener('click', () => { $('#listForm').showFrom.value = ''; updateShowFromHint(); });
 function renderKindPicker() {
   document.querySelectorAll('#kindPicker [data-kind]').forEach((b) => b.classList.toggle('sel', b.dataset.kind === pickedKind));
   $('#listForm').title.placeholder = pickedKind === 'info' ? 'z. B. Infos & Links' : 'z. B. Klassenfrühstück';
@@ -966,6 +992,8 @@ function openListDialog(list) {
   pickedEmoji = list?.emoji || '';
   pickedKind = list?.kind || 'normal';
   renderKindPicker();
+  f.showFrom.value = list?.show_from ? toLocalInput(list.show_from) : '';
+  updateShowFromHint();
   f.title.value = list?.title || ''; f.date.value = list?.date || ''; f.note.value = list?.note || '';
   $('#dialogTitle').textContent = list ? '✏️ Liste bearbeiten' : '✨ Neue Liste';
   $('#dialogSave').textContent = list ? 'Speichern' : 'Erstellen';
@@ -985,8 +1013,11 @@ $('#listForm').addEventListener('submit', async (e) => {
     let id = editingId;
     if (editingId) await rpc('update_list', { p_id: editingId, ...args });
     else id = (await rpc('create_list', args)).id;
-    const before = lists.find((l) => l.id === id)?.kind || 'normal';
-    if (pickedKind !== before) await rpc('set_list_kind', { p_id: id, p_kind: pickedKind });
+    const old = lists.find((l) => l.id === id);
+    if (pickedKind !== (old?.kind || 'normal')) await rpc('set_list_kind', { p_id: id, p_kind: pickedKind });
+    const showFrom = f.showFrom.value ? new Date(f.showFrom.value).toISOString() : null;
+    const oldShow = old?.show_from ? new Date(old.show_from).toISOString() : null;
+    if (showFrom !== oldShow) await rpc('set_list_schedule', { p_id: id, p_show_from: showFrom });
     lists = await rpc('get_lists');
     render();
     $('#listDialog').close();

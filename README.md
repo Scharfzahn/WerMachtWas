@@ -23,11 +23,12 @@ Haupt-Servers – auf der Admin-Seite unten ändern!).
 - Geräte sperren: Admins sehen pro Eintrag einen anonymen Gerätecode (gleiche Farbe = gleiches Gerät) und können Geräte sperren
 - Ordnung: Einträge werden automatisch in Kategorien sortiert (Admins können korrigieren), Sortieren nach Kategorie/A–Z/Person/Neueste, Suchfeld, Hinweis bei doppelten Einträgen
 - Info-Listen („📌 Infos & Links“): nur Admins posten Texte und Links, alle anderen lesen; Links werden automatisch klickbar
+- „Sichtbar ab“: Listen können für einen späteren Zeitpunkt geplant werden – vorher sehen sie nur Admins
 
 Passwörter stehen **nicht** im Code – nur als bcrypt-Hash in der Datenbank. Alle Rechte werden in der Datenbank geprüft.
 
 ## Einrichtung (neu)
-1. Supabase-Projekt anlegen, im **SQL Editor** nacheinander `supabase/setup.sql`, `supabase/update-3-server.sql`, `supabase/update-4-server-emoji.sql`, `supabase/update-5-papierkorb.sql` , `supabase/update-6-geraete-sperren.sql` , `supabase/update-7-kategorien.sql` und `supabase/update-8-info-listen.sql` ausführen.
+1. Supabase-Projekt anlegen, im **SQL Editor** nacheinander `supabase/setup.sql`, `supabase/update-3-server.sql`, `supabase/update-4-server-emoji.sql`, `supabase/update-5-papierkorb.sql` , `supabase/update-6-geraete-sperren.sql` , `supabase/update-7-kategorien.sql` , `supabase/update-8-info-listen.sql` und `supabase/update-9-sichtbar-ab.sql` ausführen.
 2. Passwörter des Haupt-Servers und das Haupt-Admin-Passwort setzen:
    ```sql
    update public.servers set
