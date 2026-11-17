@@ -268,6 +268,26 @@
   .cat-grid button.sel { border-color: var(--pink); background: rgba(255,95,162,.18); }
   .cat-grid button:hover { background: var(--glass-strong); }
   .no-hits { text-align: center; color: var(--muted); padding: 30px 0; }
+  .kind-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .kind-picker button { padding: 12px; border-radius: 12px; background: rgba(0,0,0,.25); border: 2px solid transparent; text-align: left; display: grid; gap: 4px; }
+  .kind-picker button small { color: var(--muted); font-size: .78rem; }
+  .kind-picker button.sel { border-color: var(--pink); background: rgba(255,95,162,.18); }
+  .tag.info-tag { background: rgba(34,211,238,.15); color: #67e8f9; margin-top: 4px; }
+  ul.info-list { margin-top: 14px; }
+  li.info-post { display: block; padding: 14px 16px; border-left: 3px solid #22d3ee; }
+  .info-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; font-weight: 600; }
+  .info-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; color: var(--muted); font-size: .8rem; }
+  a.link {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; margin: 2px 0; border-radius: 999px;
+    background: rgba(34,211,238,.15); color: #67e8f9; text-decoration: none; font-weight: 700; word-break: break-all;
+  }
+  a.link:hover { background: rgba(34,211,238,.28); }
+  .info-form { display: grid; gap: 8px; }
+  .info-form textarea {
+    width: 100%; padding: 12px 15px; border-radius: 14px; border: 1px solid var(--border); background: rgba(0,0,0,.25);
+    color: inherit; font: inherit; resize: vertical; min-height: 60px; outline: none;
+  }
+  .info-form textarea:focus { border-color: var(--pink); box-shadow: 0 0 0 4px rgba(255,95,162,.2); }
   .blocked-banner { padding: 14px 16px; margin-bottom: 18px; border-radius: 14px; background: rgba(255,107,107,.15); border: 1px solid rgba(255,107,107,.4); font-weight: 700; }
   .empty-items { color: var(--muted); text-align: center; padding: 14px; font-size: .95rem; }
 
@@ -442,6 +462,11 @@
 <dialog id="listDialog" class="glass">
   <form id="listForm" method="dialog">
     <h2 id="dialogTitle">✨ Neue Liste</h2>
+    <div class="field-label">Art der Liste</div>
+    <div id="kindPicker" class="kind-picker">
+      <button type="button" data-kind="normal"><b>📝 Mitbring-Liste</b><small>Alle können eintragen und abhaken</small></button>
+      <button type="button" data-kind="info"><b>📌 Infos & Links</b><small>Nur Admins posten, alle lesen</small></button>
+    </div>
     <label>Name<input name="title" placeholder="z. B. Klassenfrühstück" required maxlength="100"></label>
     <div class="field-label">Emoji</div>
     <div id="emojiPicker" class="emoji-picker"></div>
@@ -665,6 +690,39 @@ function sortItems(items, mode) {
   return a.map((x) => x.i);
 }
 
+// Text mit klickbaren Links (nur http/https bzw. www.). Alles andere wird escaped.
+function linkify(text) {
+  const re = /(?:\bhttps?:\/\/|\bwww\.)[^\s<>"']+/gi;
+  let out = '', last = 0, m;
+  while ((m = re.exec(text))) {
+    const raw = m[0].replace(/[.,;:!?)\]]+$/, '');
+    const url = /^www\./i.test(raw) ? 'https://' + raw : raw;
+    let label;
+    try {
+      const u = new URL(url);
+      if (!/^https?:$/.test(u.protocol)) throw 0;
+      const rest = (u.pathname + u.search).replace(/\/$/, '');
+      label = u.hostname.replace(/^www\./, '') + (rest.length > 22 ? rest.slice(0, 20) + '…' : rest);
+    } catch { continue; }
+    out += esc(text.slice(last, m.index))
+      + `<a class="link" href="${esc(url)}" target="_blank" rel="noopener noreferrer nofollow">🔗 ${esc(label)}</a>`;
+    last = m.index + raw.length; re.lastIndex = last;
+  }
+  return out + esc(text.slice(last));
+}
+
+function infoItemHtml(i, admin) {
+  const when = i.created_at ? new Date(i.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
+  return `
+    <li class="info-post" data-item="${i.id}">
+      <div class="info-text">${linkify(i.what)}</div>
+      <div class="info-meta">
+        <span>${i.who ? esc(i.who) + ' · ' : ''}${when}</span>
+        ${admin ? `<button class="del" data-action="delItem" title="Entfernen">✕</button>` : ''}
+      </div>
+    </li>`;
+}
+
 function itemHtml(i, admin) {
   const own = i.mine ?? (i.owner === me?.uid);
   const mine = admin || own;
@@ -710,12 +768,12 @@ function render() {
     return `
     <article class="list glass ${l.hidden ? 'is-hidden' : ''}" data-list="${l.id}">
       <div class="list-head">
-        <div class="list-emoji">${l.emoji || emojiFor(l.title)}</div>
+        <div class="list-emoji">${l.emoji || (l.kind === 'info' ? '📌' : emojiFor(l.title))}</div>
         <div class="list-info">
           <h3>${esc(l.title)}</h3>
           <div class="meta">
             ${l.date ? `<span>📅 ${fmtDate(l.date)}</span>` : ''}
-            <span>📝 ${total} ${total === 1 ? 'Eintrag' : 'Einträge'}</span>
+            <span>${l.kind === 'info' ? `📌 ${total} ${total === 1 ? 'Beitrag' : 'Beiträge'}` : `📝 ${total} ${total === 1 ? 'Eintrag' : 'Einträge'}`}</span>
           </div>
           ${statusTag(l, admin)}
           ${l.note ? `<div class="note">${esc(l.note)}</div>` : ''}
@@ -725,6 +783,18 @@ function render() {
           <button class="chip-btn danger" data-action="delList">Löschen</button>
         </div>` : ''}
       </div>
+      ${l.kind === 'info' ? `
+      <div class="meta"><span class="tag info-tag">📌 Nur Admins können hier posten</span></div>
+      <ul class="info-list">
+        ${visible.slice().reverse().map((i) => infoItemHtml(i, admin)).join('') || `<li class="empty-items" style="display:block">${admin ? 'Noch nichts gepostet – teile unten einen Link oder eine Info.' : 'Noch keine Infos.'}</li>`}
+      </ul>
+      ${admin ? `<form class="info-form">
+        <textarea name="what" rows="2" placeholder="Text oder Link, z. B. https://…" required maxlength="500"></textarea>
+        <div class="add-row two">
+          <input name="who" placeholder="Von (optional)" maxlength="60" value="${esc(store.get('name') || '')}">
+          <button class="btn" type="submit">📌 Posten</button>
+        </div>
+      </form>` : ''}` : `
       ${total ? `
         <div class="progress"><div style="width:${pct}%"></div></div>
         <div class="progress-label">${done} von ${total} erledigt${pct === 100 ? ' 🎉' : ''}</div>` : ''}
@@ -738,7 +808,7 @@ function render() {
         <input name="what" placeholder="Was? (z. B. Brötchen)" required maxlength="150">
         <input name="who" placeholder="Dein Name" maxlength="60" value="${esc(store.get('name') || '')}">
         <button class="btn" type="submit">+ Eintragen</button>
-      </form>`}
+      </form>`}`}
     </article>`;
   }).join('');
 }
@@ -867,7 +937,7 @@ $('#trashContent').addEventListener('click', (e) => {
 });
 
 // ---- Dialog: Liste erstellen / bearbeiten ----
-const EMOJIS = ['🥐','🥨','🍞','🧀','🍓','🍕','🌭','🍰','🎂','🍪','🥤','🎉','🎈','🎁','🎄','🐣','🚌','🏕️','⚽','🎬','📚','🎨','🎵','📋'];
+const EMOJIS = ['📌','📢','🔗','📅','🥐','🥨','🍞','🧀','🍓','🍕','🌭','🍰','🎂','🍪','🥤','🎉','🎈','🎁','🎄','🐣','🚌','🏕️','⚽','🎬','📚','🎨','🎵','📋'];
 let editingId = null, pickedEmoji = '';
 
 function renderPicker() {
@@ -880,10 +950,22 @@ $('#emojiPicker').addEventListener('click', (e) => {
   pickedEmoji = b.dataset.emoji; renderPicker();
 });
 
+let pickedKind = 'normal';
+function renderKindPicker() {
+  document.querySelectorAll('#kindPicker [data-kind]').forEach((b) => b.classList.toggle('sel', b.dataset.kind === pickedKind));
+  $('#listForm').title.placeholder = pickedKind === 'info' ? 'z. B. Infos & Links' : 'z. B. Klassenfrühstück';
+}
+$('#kindPicker').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-kind]'); if (!b) return;
+  pickedKind = b.dataset.kind; renderKindPicker();
+});
+
 function openListDialog(list) {
   const f = $('#listForm');
   editingId = list?.id || null;
   pickedEmoji = list?.emoji || '';
+  pickedKind = list?.kind || 'normal';
+  renderKindPicker();
   f.title.value = list?.title || ''; f.date.value = list?.date || ''; f.note.value = list?.note || '';
   $('#dialogTitle').textContent = list ? '✏️ Liste bearbeiten' : '✨ Neue Liste';
   $('#dialogSave').textContent = list ? 'Speichern' : 'Erstellen';
@@ -900,8 +982,11 @@ $('#listForm').addEventListener('submit', async (e) => {
   const args = { p_title: f.title.value, p_date: f.date.value, p_note: f.note.value, p_emoji: pickedEmoji };
   btn.disabled = true;
   try {
+    let id = editingId;
     if (editingId) await rpc('update_list', { p_id: editingId, ...args });
-    else await rpc('create_list', args);
+    else id = (await rpc('create_list', args)).id;
+    const before = lists.find((l) => l.id === id)?.kind || 'normal';
+    if (pickedKind !== before) await rpc('set_list_kind', { p_id: id, p_kind: pickedKind });
     lists = await rpc('get_lists');
     render();
     $('#listDialog').close();
@@ -918,15 +1003,15 @@ $('#lists').addEventListener('submit', async (e) => {
     const who = f.who.value.trim();
     if (who) store.set('name', who);
     const list = lists.find((l) => l.id === listId);
-    const dup = findSimilar(list, f.what.value);
+    const dup = list.kind === 'info' ? null : findSimilar(list, f.what.value);
     if (dup && !confirm(`„${dup.what}“ steht schon auf der Liste${dup.who ? ` (bringt ${dup.who} mit)` : ''}.\n\nTrotzdem eintragen?`)) {
       btn.disabled = false; return;
     }
     const item = await rpc('add_item', { p_list_id: listId, p_what: f.what.value, p_who: who });
     lists.find((l) => l.id === listId).items.push(item);
     render();
-    document.querySelector(`[data-list="${listId}"] input[name=what]`).focus();
-    toast('✅ Eingetragen');
+    document.querySelector(`[data-list="${listId}"] [name=what]`).focus();
+    toast(list.kind === 'info' ? '📌 Gepostet' : '✅ Eingetragen');
   } catch { btn.disabled = false; }
 });
 
@@ -970,7 +1055,7 @@ $('#lists').addEventListener('click', async (e) => {
 
 // Alle 15 Sekunden aktualisieren (nicht während man tippt)
 setInterval(() => {
-  if (me && !IS_SUPER && !document.activeElement.matches('input') && !$('#listDialog').open && !$('#trashDialog').open && !$('#catDialog').open) rpc('get_lists', {}, { silent: true }).then((l) => { lists = l; render(); }).catch(() => {});
+  if (me && !IS_SUPER && !document.activeElement.matches('input, textarea') && !$('#listDialog').open && !$('#trashDialog').open && !$('#catDialog').open) rpc('get_lists', {}, { silent: true }).then((l) => { lists = l; render(); }).catch(() => {});
 }, 15000);
 
 // ================= Admin-Startseite (/admin) =================
